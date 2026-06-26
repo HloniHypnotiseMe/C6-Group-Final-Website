@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { Footer } from '@/components/Footer';
 import { WhatsAppChat } from '@/components/WhatsAppChat';
-import { ArrowRight, TrendingUp, Bot, Zap, BarChart3, CheckCircle2, Star, Phone, MessageCircle } from 'lucide-react';
+import { ArrowRight, TrendingUp, Bot, Zap, BarChart3, CheckCircle2, Star, Phone, MessageCircle, Mail } from 'lucide-react';
 
 /* ── Trust logos ── */
 function TrustLogos() {
@@ -33,12 +33,12 @@ function HeroSection() {
           <div className="max-w-xl">
             <span className="eyebrow mb-4 inline-block">AI-Powered Business Growth</span>
             <h1 className="mb-6">
-              Grow Your South African Business With{' '}
-              <span className="text-emerald-600">AI</span>
+              Automate Your Marketing, Grow Your{' '}
+              <span className="text-emerald-600">South African Business</span>
             </h1>
             <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-              C6GROUP helps SMEs automate operations, attract more customers, and increase revenue
-              using 100+ specialised AI tools designed for the South African market.
+              C6GROUP helps SMEs get found online, engage customers automatically, and grow revenue
+              using AI-powered tools designed for the South African market.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Link to="/audit" className="btn-primary">
@@ -95,6 +95,12 @@ function FeaturesSection() {
       image: '/feature-ai-tools.jpg',
     },
     {
+      icon: Mail,
+      title: 'Email Marketing Suite',
+      description: 'Launch high-deliverability email campaigns with unlimited sends and AI-powered content generation.',
+      image: '/feature-email.jpg',
+    },
+    {
       icon: BarChart3,
       title: 'Business Analytics',
       description: 'Track revenue, customer behaviour, and growth metrics with AI-powered dashboards.',
@@ -120,7 +126,7 @@ function FeaturesSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, i) => (
             <div key={i} className="card-clean overflow-hidden group">
               <div className="aspect-[3/2] overflow-hidden -mx-6 -mt-6 mb-5">
@@ -196,30 +202,33 @@ function HowItWorksSection() {
 function PackagesSection() {
   const packages = [
     {
-      name: 'Lead',
+      name: 'Start',
+      tagline: 'Get Found & Get Leads',
       price: 'Free',
-      description: 'Start your AI journey with a free business audit.',
-      features: ['1 Free AI Business Audit', '10 AI Tool Uses/Month', 'Basic Analytics Dashboard', 'WhatsApp Support'],
+      description: 'Start your AI journey with a free business audit and online visibility.',
+      features: ['1 Free AI Business Audit', 'Basic Directory Listing', '10 AI Tool Uses/Month', 'WhatsApp Support'],
       cta: 'Get Started',
       href: '/register',
       featured: false,
     },
     {
-      name: 'Diamond',
+      name: 'Grow',
+      tagline: 'Automated Engagement',
       price: 'R299',
       period: '/month',
-      description: 'Perfect for small businesses ready to grow.',
-      features: ['5 AI Audits/Month', '50 AI Tool Uses/Month', 'Advanced Analytics', 'Marketing Automation', 'Email Support'],
+      description: 'Automate your marketing and customer engagement.',
+      features: ['5 AI Audits/Month', 'Email Marketing Suite', 'Social Media Automation', '50 AI Tool Uses/Month'],
       cta: 'Start Free Trial',
       href: '/register',
       featured: true,
     },
     {
-      name: 'Gold',
+      name: 'Scale',
+      tagline: 'Revenue & Customer Growth',
       price: 'R699',
       period: '/month',
-      description: 'For growing businesses that need more power.',
-      features: ['10 AI Audits/Month', '200 AI Tool Uses/Month', 'Full Analytics Suite', 'Priority Support', 'Custom Integrations'],
+      description: 'Advanced automation and AI-powered lead generation.',
+      features: ['10 AI Audits/Month', 'Advanced Analytics', 'AI Lead Generation', '200 AI Tool Uses/Month'],
       cta: 'Start Free Trial',
       href: '/register',
       featured: false,
@@ -252,6 +261,7 @@ function PackagesSection() {
               <h3 className={`text-lg font-semibold mb-1 ${pkg.featured ? 'text-white' : 'text-slate-900'}`}>
                 {pkg.name}
               </h3>
+              <p className={`text-xs font-medium uppercase tracking-wide mb-2 ${pkg.featured ? 'text-emerald-400' : 'text-emerald-600'}`}>{pkg.tagline}</p>
               <div className="flex items-baseline gap-1 mb-2">
                 <span className={`text-3xl font-bold ${pkg.featured ? 'text-white' : 'text-slate-900'}`}>{pkg.price}</span>
                 {pkg.period && <span className={`text-sm ${pkg.featured ? 'text-slate-300' : 'text-slate-500'}`}>{pkg.period}</span>}
@@ -280,8 +290,42 @@ function PackagesSection() {
 
         <p className="text-center text-sm text-slate-500 mt-8">
           Need a custom solution?{' '}
+          <span className="font-medium text-slate-700">Enterprise plans start from R500k/year.</span>{' '}
           <a href="https://wa.me/27735558440" className="link-underline">Contact us</a> for enterprise pricing.
         </p>
+      </div>
+    </section>
+  );
+}
+
+/* ── Enterprise CTA ── */
+function EnterpriseSection() {
+  return (
+    <section className="py-16 md:py-20 bg-slate-900">
+      <div className="container-max section-padding">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="w-12 h-12 bg-emerald-600/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <TrendingUp className="w-6 h-6 text-emerald-400" />
+          </div>
+          <h2 className="text-white mb-3">Need a Custom Solution?</h2>
+          <p className="text-slate-300 text-lg mb-2 max-w-2xl mx-auto">
+            For large organisations and businesses with unique needs, we build fully custom AI infrastructure 
+            and dedicated teams to handle your exact requirements.
+          </p>
+          <p className="text-emerald-400 font-bold text-2xl mb-6">
+            Enterprise plans start from R500k/year
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="https://wa.me/27735558440" target="_blank" rel="noopener noreferrer"
+              className="btn-primary bg-emerald-600 hover:bg-emerald-500"
+            >
+              Contact Us for a Quote <ArrowRight className="ml-2 w-4 h-4" />
+            </a>
+            <a href="tel:+27735558440" className="btn-secondary bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
+              Call Us: 073 555 8440
+            </a>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -396,6 +440,7 @@ export function Home() {
         <HowItWorksSection />
         <PackagesSection />
         <TestimonialsSection />
+        <EnterpriseSection />
         <CTASection />
       </main>
       <Footer />

@@ -14,6 +14,7 @@ import { BlogPage } from '@/pages/Blog';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { POPIAPage } from '@/pages/POPIA';
 import { CookiesPage } from '@/pages/Cookies';
+import { EmailSuitePage } from '@/pages/EmailSuite';
 import { Toaster } from '@/components/ui/sonner';
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/popia" element={<POPIAPage />} />
           <Route path="/cookies" element={<CookiesPage />} />
+          <Route path="/email-suite" element={<EmailSuitePage />} />
         </Routes>
         <Toaster position="top-right" richColors />
       </Router>
