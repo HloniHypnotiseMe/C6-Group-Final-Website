@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { prisma } from '../utils/prisma';
 import { createError } from '../middleware/errorHandler';
-import { logger } from '../utils/logger';
+import { prisma } from '../utils/prisma';
 import { packageConfigs } from '../config/packages';
 import { PackageType } from '../types';
+import { BillingCycle } from '@prisma/client';
+import { logger } from '../utils/logger';
 import axios from 'axios';
 
 const router = Router();
@@ -44,10 +45,6 @@ router.get('/methods', authenticate, async (_req, res, next) => {
   }
 });
 
-/**
- * Create a payment record against an existing subscription.
- * This endpoint never invents a provider checkout URL.
- */
 router.post('/', authenticate, async (req, res, next) => {
   try {
     const { subscriptionId, paymentMethod } = req.body;
@@ -77,7 +74,9 @@ router.post('/', authenticate, async (req, res, next) => {
       throw createError('Subscription package is invalid', 400, 'INVALID_PACKAGE');
     }
 
-    const amount = subscription.billingCycle === 'ANNUAL' ? config.annualPrice : config.monthlyPrice;
+    const amount = subscription.billingCycle === BillingCycle.ANNUAL
+      ? config.annualPrice
+      : config.monthlyPrice;
 
     const payment = await prisma.payment.create({
       data: {
@@ -171,11 +170,6 @@ router.get('/history', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * Initialize a real SimplyBlu payment.
- * The package price is taken server-side; clients cannot choose their own price.
- * Never returns a simulated checkout URL.
- */
 router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
   try {
     const { currency = 'ZAR', description, packageId, billingCycle = 'MONTHLY' } = req.body;
@@ -198,11 +192,12 @@ router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
     }
 
     const normalizedCycle = String(billingCycle).toUpperCase();
-    if (normalizedCycle !== 'MONTHLY' && normalizedCycle !== 'ANNUAL') {
+    if (normalizedCycle !== BillingCycle.MONTHLY && normalizedCycle !== BillingCycle.ANNUAL) {
       throw createError('Invalid billing cycle', 400, 'INVALID_BILLING_CYCLE');
     }
 
-    const amount = normalizedCycle === 'ANNUAL' ? config.annualPrice : config.monthlyPrice;
+    const cycle = normalizedCycle as BillingCycle;
+    const amount = cycle === BillingCycle.ANNUAL ? config.annualPrice : config.monthlyPrice;
     if (amount <= 0) {
       throw createError('The selected package does not require a payment', 400, 'NO_PAYMENT_REQUIRED');
     }
@@ -214,14 +209,14 @@ router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
         userId: req.user!.userId,
         packageId,
         status: 'PENDING',
-        billingCycle: normalizedCycle,
+        billingCycle: cycle,
         aiUsageLimit: Object.values(config.aiLimits).reduce(
           (sum, limit) => sum + (limit === -1 ? 999999 : Number(limit)),
           0
         ),
         aiUsageUsed: 0,
         startDate: new Date(),
-        nextBillingDate: normalizedCycle === 'ANNUAL'
+        nextBillingDate: cycle === BillingCycle.ANNUAL
           ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
