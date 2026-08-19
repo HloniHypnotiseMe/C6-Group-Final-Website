@@ -3,6 +3,8 @@ import { authenticate } from '../middleware/auth';
 import { prisma } from '../utils/prisma';
 import { createError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
+import { packageConfigs } from '../config/packages';
+import { PackageType } from '../types';
 import axios from 'axios';
 
 const router = Router();
@@ -15,10 +17,6 @@ const simplyBluConfigured = Boolean(
   SIMPLYBLU_API_URL && SIMPLYBLU_PUBLIC_KEY && SIMPLYBLU_PRIVATE_KEY
 );
 
-/**
- * Get payment methods that are actually configured for this deployment.
- * Unsupported/demo methods must never be advertised as live payment options.
- */
 router.get('/methods', authenticate, async (_req, res, next) => {
   try {
     const methods = simplyBluConfigured
@@ -47,15 +45,15 @@ router.get('/methods', authenticate, async (_req, res, next) => {
 });
 
 /**
- * Create a generic payment record.
- * Provider execution is intentionally limited to configured providers.
+ * Create a payment record against an existing subscription.
+ * This endpoint never invents a provider checkout URL.
  */
 router.post('/', authenticate, async (req, res, next) => {
   try {
-    const { amount, currency = 'ZAR', paymentMethod, description, metadata } = req.body;
+    const { subscriptionId, paymentMethod } = req.body;
 
-    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || !paymentMethod) {
-      throw createError('A positive amount and payment method are required', 400, 'MISSING_FIELDS');
+    if (!subscriptionId || !paymentMethod) {
+      throw createError('Subscription ID and payment method are required', 400, 'MISSING_FIELDS');
     }
 
     if (paymentMethod !== 'simplyblu') {
@@ -66,11 +64,26 @@ router.post('/', authenticate, async (req, res, next) => {
       throw createError('Payment provider is not configured', 503, 'PAYMENT_PROVIDER_NOT_CONFIGURED');
     }
 
+    const subscription = await prisma.subscription.findFirst({
+      where: { id: subscriptionId, userId: req.user!.userId, status: 'PENDING' },
+    });
+
+    if (!subscription) {
+      throw createError('Pending subscription not found', 404, 'SUBSCRIPTION_NOT_FOUND');
+    }
+
+    const config = packageConfigs[subscription.packageId as PackageType];
+    if (!config) {
+      throw createError('Subscription package is invalid', 400, 'INVALID_PACKAGE');
+    }
+
+    const amount = subscription.billingCycle === 'ANNUAL' ? config.annualPrice : config.monthlyPrice;
+
     const payment = await prisma.payment.create({
       data: {
-        subscriptionId: metadata?.subscriptionId || 'pending',
-        amount: Number(amount),
-        currency,
+        subscriptionId: subscription.id,
+        amount,
+        currency: 'ZAR',
         status: 'PENDING',
         paymentMethod,
         transactionId: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
@@ -97,7 +110,12 @@ router.post('/', authenticate, async (req, res, next) => {
 
 router.get('/:id/status', authenticate, async (req, res, next) => {
   try {
-    const payment = await prisma.payment.findUnique({ where: { id: req.params.id } });
+    const payment = await prisma.payment.findFirst({
+      where: {
+        id: req.params.id,
+        subscription: { userId: req.user!.userId },
+      },
+    });
 
     if (!payment) {
       throw createError('Payment not found', 404, 'NOT_FOUND');
@@ -155,14 +173,15 @@ router.get('/history', authenticate, async (req, res, next) => {
 
 /**
  * Initialize a real SimplyBlu payment.
+ * The package price is taken server-side; clients cannot choose their own price.
  * Never returns a simulated checkout URL.
  */
 router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
   try {
-    const { amount, currency = 'ZAR', description, packageId, metadata } = req.body;
+    const { currency = 'ZAR', description, packageId, billingCycle = 'MONTHLY' } = req.body;
 
-    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || !description || !packageId) {
-      throw createError('Amount, description, and packageId are required', 400, 'MISSING_FIELDS');
+    if (!description || !packageId) {
+      throw createError('Description and packageId are required', 400, 'MISSING_FIELDS');
     }
 
     if (!simplyBluConfigured) {
@@ -173,24 +192,45 @@ router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
       );
     }
 
+    const config = packageConfigs[packageId as PackageType];
+    if (!config) {
+      throw createError('Invalid package', 400, 'INVALID_PACKAGE');
+    }
+
+    const normalizedCycle = String(billingCycle).toUpperCase();
+    if (normalizedCycle !== 'MONTHLY' && normalizedCycle !== 'ANNUAL') {
+      throw createError('Invalid billing cycle', 400, 'INVALID_BILLING_CYCLE');
+    }
+
+    const amount = normalizedCycle === 'ANNUAL' ? config.annualPrice : config.monthlyPrice;
+    if (amount <= 0) {
+      throw createError('The selected package does not require a payment', 400, 'NO_PAYMENT_REQUIRED');
+    }
+
     const amountInCents = Math.round(Number(amount) * 100);
 
     const subscription = await prisma.subscription.create({
       data: {
         userId: req.user!.userId,
-        packageType: packageId,
+        packageId,
         status: 'PENDING',
-        billingCycle: metadata?.billingCycle || 'monthly',
-        amount: Number(amount),
-        currency,
-        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        billingCycle: normalizedCycle,
+        aiUsageLimit: Object.values(config.aiLimits).reduce(
+          (sum, limit) => sum + (limit === -1 ? 999999 : Number(limit)),
+          0
+        ),
+        aiUsageUsed: 0,
+        startDate: new Date(),
+        nextBillingDate: normalizedCycle === 'ANNUAL'
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
     const payment = await prisma.payment.create({
       data: {
         subscriptionId: subscription.id,
-        amount: Number(amount),
+        amount,
         currency,
         status: 'PENDING',
         paymentMethod: 'simplyblu',
@@ -218,14 +258,10 @@ router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
         }
       );
 
-      const checkoutUrl =
-        apiResponse.data?.redirectUrl ||
-        apiResponse.data?.paymentUrl ||
-        apiResponse.data?.url;
+      const checkoutUrl = apiResponse.data?.redirectUrl || apiResponse.data?.paymentUrl || apiResponse.data?.url;
 
       if (typeof checkoutUrl !== 'string' || !checkoutUrl.startsWith('https://')) {
-        logger.error(`SimplyBlu returned no valid checkout URL for payment ${payment.id}`);
-        throw createError('Payment provider returned no valid checkout URL', 502, 'INVALID_PROVIDER_RESPONSE');
+        throw new Error('SimplyBlu returned no valid HTTPS checkout URL');
       }
 
       logger.info(`SimplyBlu payment initiated: ${payment.id}`);
@@ -244,21 +280,18 @@ router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
         meta: { timestamp: new Date().toISOString() },
       });
     } catch (providerError: any) {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'FAILED' },
-      });
-      await prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { status: 'CANCELLED' },
-      });
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED' },
+        }),
+        prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { status: 'CANCELLED', endDate: new Date() },
+        }),
+      ]);
 
       logger.error('SimplyBlu payment initiation failed', providerError?.response?.data || providerError?.message);
-
-      if (providerError?.statusCode) {
-        throw providerError;
-      }
-
       throw createError('Payment provider could not initialize the payment', 502, 'PAYMENT_PROVIDER_ERROR');
     }
   } catch (error) {
