@@ -4,8 +4,76 @@ import { Link } from 'react-router-dom';
 import { animate, stagger } from 'animejs';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { packages } from '@/data/content';
 import { cn, formatCurrency } from '@/lib/utils';
+
+/**
+ * Commercial packaging principle:
+ * Customers buy business outcomes, not AI calls.
+ * The AI tools remain the delivery infrastructure underneath each package.
+ * Pricing is intentionally positioned as an introductory commercial ladder and
+ * should be validated against delivery cost and customer economics before launch.
+ */
+const packages = [
+  {
+    id: 'audit',
+    name: 'Business Audit',
+    price: 0,
+    description: 'Find the biggest opportunities hiding inside your business.',
+    features: [
+      'AI business health assessment',
+      'Digital visibility review',
+      'Customer acquisition review',
+      'Revenue opportunity analysis',
+      'Personalised growth recommendations'
+    ],
+    ctaText: 'Get My Free Audit'
+  },
+  {
+    id: 'visibility',
+    name: 'Visibility Machine',
+    price: 499,
+    description: 'Get found, look credible, and turn local attention into enquiries.',
+    features: [
+      'Business listing & profile optimisation',
+      'AI-assisted content creation',
+      'Search & visibility support',
+      'Reputation and review support',
+      'Growth reporting'
+    ],
+    highlighted: true,
+    ctaText: 'Build My Visibility'
+  },
+  {
+    id: 'growth',
+    name: 'Customer Growth Machine',
+    price: 1499,
+    description: 'Turn attention into leads with a connected AI growth workforce.',
+    features: [
+      'Everything in Visibility Machine',
+      'Lead generation workflows',
+      'Email marketing automation',
+      'Social content & campaign support',
+      'AI customer engagement',
+      'Advanced growth analytics'
+    ],
+    ctaText: 'Grow My Customer Base'
+  },
+  {
+    id: 'revenue',
+    name: 'Revenue Machine',
+    price: 3499,
+    description: 'A deeper AI operating layer for businesses ready to scale revenue.',
+    features: [
+      'Everything in Customer Growth Machine',
+      'AI sales & follow-up workflows',
+      'Business intelligence reporting',
+      'Advanced customer segmentation',
+      'Custom automation workflows',
+      'Priority support'
+    ],
+    ctaText: 'Scale My Revenue'
+  }
+];
 
 export function PackageShowcase() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -15,7 +83,6 @@ export function PackageShowcase() {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Animate section title
             animate('.package-title', {
               opacity: [0, 1],
               translateY: [30, 0],
@@ -23,7 +90,6 @@ export function PackageShowcase() {
               ease: 'outQuart'
             });
 
-            // Animate package cards
             animate('.package-card-item', {
               opacity: [0, 1],
               translateY: [50, 0],
@@ -40,30 +106,24 @@ export function PackageShowcase() {
       { threshold: 0.1 }
     );
 
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
+    if (sectionRef.current) observer.observe(sectionRef.current);
     return () => observer.disconnect();
   }, []);
-
-  const displayPackages = packages.slice(0, 3); // Show Lead, Diamond, Gold
 
   return (
     <section ref={sectionRef} className="py-20 bg-deep-space">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="package-title opacity-0 text-center mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-poppins font-bold mb-6">
-            Choose Your <span className="gradient-text">AI Growth Package</span>
+            Choose Your <span className="gradient-text">Business Growth Machine</span>
           </h2>
           <p className="text-lg sm:text-xl text-soft-silver max-w-3xl mx-auto">
-            Transparent pricing for South African SMEs. No setup fees, no hidden costs. 
-            Just powerful AI tools to grow your business.
+            We combine AI agents, automation, analytics and business intelligence into practical growth systems. You buy the outcome — C6 provides the machinery behind it.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {displayPackages.map((pkg) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {packages.map((pkg) => (
             <div
               key={pkg.id}
               className={cn(
@@ -85,17 +145,17 @@ export function PackageShowcase() {
                   {pkg.price === 0 ? 'Free' : formatCurrency(pkg.price)}
                 </div>
                 <div className="text-sm text-soft-silver">
-                  {pkg.price === 0 ? 'Forever' : 'per month'}
+                  {pkg.price === 0 ? 'No card required' : 'per month'}
                 </div>
                 <div className="text-xs text-soft-silver mt-2">{pkg.description}</div>
               </div>
 
               <div className="space-y-3 mb-8">
-                {pkg.features.map((feature, featureIndex) => (
-                  <div key={featureIndex} className="flex items-center text-sm">
+                {pkg.features.map((feature) => (
+                  <div key={feature} className="flex items-start text-sm">
                     <Check
                       className={cn(
-                        'w-5 h-5 mr-3 flex-shrink-0',
+                        'w-5 h-5 mr-3 mt-0.5 flex-shrink-0',
                         pkg.highlighted ? 'text-warm-gold' : 'text-electric-cyan'
                       )}
                     />
@@ -113,31 +173,21 @@ export function PackageShowcase() {
                     : 'bg-electric-cyan text-space-navy hover:bg-warm-gold'
                 )}
               >
-                <Link to="/packages">{pkg.ctaText}</Link>
+                <Link to={pkg.price === 0 ? '/audit' : '/packages'}>{pkg.ctaText}</Link>
               </Button>
             </div>
           ))}
         </div>
 
-        {/* Enterprise CTA */}
         <div className="package-card-item opacity-0 mt-12">
-          <div className="glass-morphism rounded-xl p-6 max-w-2xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <div className="text-2xl font-bold text-electric-cyan">Enterprise</div>
-                <div className="text-sm text-soft-silver">Custom solutions for large businesses</div>
-              </div>
-              <div className="text-center sm:text-left">
-                <div className="text-lg font-semibold">SuperAI Agents</div>
-                <div className="text-sm text-soft-silver">Dedicated consultant</div>
-              </div>
-              <Button
-                asChild
-                className="bg-electric-cyan text-space-navy hover:bg-warm-gold font-semibold"
-              >
-                <Link to="/packages">View All Packages</Link>
-              </Button>
-            </div>
+          <div className="glass-morphism rounded-xl p-6 max-w-3xl mx-auto text-center">
+            <div className="text-2xl font-bold text-electric-cyan mb-2">Custom Business Intelligence</div>
+            <p className="text-sm text-soft-silver mb-4">
+              Larger organisations can combine C6 AI agents, automation, analytics and custom integrations into a tailored operating system. Pricing follows the audit and scope — not an arbitrary headline number.
+            </p>
+            <Button asChild className="bg-electric-cyan text-space-navy hover:bg-warm-gold font-semibold">
+              <Link to="/packages">Request a Custom Plan</Link>
+            </Button>
           </div>
         </div>
       </div>
