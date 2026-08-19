@@ -7,70 +7,39 @@ import axios from 'axios';
 
 const router = Router();
 
-// RemotePay API configuration
-const REMOTEPAY_API_URL = process.env.REMOTEPAY_API_URL || 'https://api.remotepay.co.za/v1';
-const REMOTEPAY_API_KEY = process.env.REMOTEPAY_API_KEY || '';
-const REMOTEPAY_MERCHANT_ID = process.env.REMOTEPAY_MERCHANT_ID || '';
-
-// SimplyBlu (Standard Bank / Mastercard Simplify Commerce) API configuration
-const SIMPLYBLU_API_URL = process.env.SIMPLYBLU_API_URL || 'https://sandbox.simplify.com/v1';
+const SIMPLYBLU_API_URL = process.env.SIMPLYBLU_API_URL || '';
 const SIMPLYBLU_PUBLIC_KEY = process.env.SIMPLYBLU_PUBLIC_KEY || '';
 const SIMPLYBLU_PRIVATE_KEY = process.env.SIMPLYBLU_PRIVATE_KEY || '';
-const SIMPLYBLU_MERCHANT_EMAIL = process.env.SIMPLYBLU_MERCHANT_EMAIL || '';
+
+const simplyBluConfigured = Boolean(
+  SIMPLYBLU_API_URL && SIMPLYBLU_PUBLIC_KEY && SIMPLYBLU_PRIVATE_KEY
+);
 
 /**
- * Get available payment methods
- * GET /api/v1/payments/methods
+ * Get payment methods that are actually configured for this deployment.
+ * Unsupported/demo methods must never be advertised as live payment options.
  */
-router.get('/methods', authenticate, async (req, res, next) => {
+router.get('/methods', authenticate, async (_req, res, next) => {
   try {
-    const methods = [
-      {
-        id: 'card',
-        name: 'Credit/Debit Card',
-        description: 'Visa, Mastercard, American Express',
-        icon: 'credit-card',
-        enabled: true,
-        processingFee: '2.9% + R1.50',
-      },
-      {
-        id: 'instant_eft',
-        name: 'Instant EFT',
-        description: 'Ozow, PayFast EFT',
-        icon: 'bank',
-        enabled: true,
-        processingFee: '1.5% + R2.00',
-      },
-      {
-        id: 'snapscan',
-        name: 'SnapScan',
-        description: 'Scan QR code with SnapScan app',
-        icon: 'qr-code',
-        enabled: true,
-        processingFee: '2.9%',
-      },
-      {
-        id: 'zapper',
-        name: 'Zapper',
-        description: 'Scan QR code with Zapper app',
-        icon: 'qr-code',
-        enabled: true,
-        processingFee: '2.9%',
-      },
-      {
-        id: 'debit_order',
-        name: 'Debit Order',
-        description: 'Monthly automatic debit order',
-        icon: 'repeat',
-        enabled: true,
-        processingFee: 'R0',
-      },
-    ];
+    const methods = simplyBluConfigured
+      ? [
+          {
+            id: 'simplyblu',
+            name: 'Card / SimplyBlu',
+            description: 'Secure card payment through the configured SimplyBlu account.',
+            icon: 'credit-card',
+            enabled: true,
+          },
+        ]
+      : [];
 
     res.json({
       success: true,
       data: methods,
-      meta: { timestamp: new Date().toISOString() },
+      meta: {
+        timestamp: new Date().toISOString(),
+        paymentProviderConfigured: simplyBluConfigured,
+      },
     });
   } catch (error) {
     next(error);
@@ -78,60 +47,35 @@ router.get('/methods', authenticate, async (req, res, next) => {
 });
 
 /**
- * Create a payment
- * POST /api/v1/payments
+ * Create a generic payment record.
+ * Provider execution is intentionally limited to configured providers.
  */
 router.post('/', authenticate, async (req, res, next) => {
   try {
     const { amount, currency = 'ZAR', paymentMethod, description, metadata } = req.body;
 
-    if (!amount || !paymentMethod) {
-      throw createError('Amount and payment method are required', 400, 'MISSING_FIELDS');
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || !paymentMethod) {
+      throw createError('A positive amount and payment method are required', 400, 'MISSING_FIELDS');
     }
 
-    // Create payment record
+    if (paymentMethod !== 'simplyblu') {
+      throw createError('Payment method is not enabled for this deployment', 400, 'PAYMENT_METHOD_DISABLED');
+    }
+
+    if (!simplyBluConfigured) {
+      throw createError('Payment provider is not configured', 503, 'PAYMENT_PROVIDER_NOT_CONFIGURED');
+    }
+
     const payment = await prisma.payment.create({
       data: {
         subscriptionId: metadata?.subscriptionId || 'pending',
-        amount: amount,
+        amount: Number(amount),
         currency,
         status: 'PENDING',
         paymentMethod,
-        transactionId: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        transactionId: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       },
     });
-
-    // If RemotePay is configured, create payment with their API
-    let remotePayData = null;
-    if (REMOTEPAY_API_KEY) {
-      try {
-        const remotePayResponse = await axios.post(
-          `${REMOTEPAY_API_URL}/transactions`,
-          {
-            merchant_id: REMOTEPAY_MERCHANT_ID,
-            amount: amount * 100, // cents
-            currency,
-            description,
-            payment_method: paymentMethod,
-            callback_url: `${process.env.API_URL}/api/v1/webhooks/remotepay`,
-            metadata: {
-              ...metadata,
-              paymentId: payment.id,
-              userId: req.user!.userId,
-            },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${REMOTEPAY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-        remotePayData = remotePayResponse.data;
-      } catch (apiError) {
-        logger.error('RemotePay API error:', apiError);
-      }
-    }
 
     logger.info(`Payment created: ${payment.id} for user: ${req.user!.userId}`);
 
@@ -143,8 +87,6 @@ router.post('/', authenticate, async (req, res, next) => {
         status: payment.status,
         amount: payment.amount,
         currency: payment.currency,
-        paymentUrl: remotePayData?.payment_url || null,
-        checkoutUrl: remotePayData?.checkout_url || `/checkout/${payment.id}`,
       },
       meta: { timestamp: new Date().toISOString() },
     });
@@ -153,17 +95,9 @@ router.post('/', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * Get payment status
- * GET /api/v1/payments/:id/status
- */
 router.get('/:id/status', authenticate, async (req, res, next) => {
   try {
-    const { id } = req.params;
-
-    const payment = await prisma.payment.findUnique({
-      where: { id },
-    });
+    const payment = await prisma.payment.findUnique({ where: { id: req.params.id } });
 
     if (!payment) {
       throw createError('Payment not found', 404, 'NOT_FOUND');
@@ -187,50 +121,32 @@ router.get('/:id/status', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * Get payment history
- * GET /api/v1/payments/history
- */
 router.get('/history', authenticate, async (req, res, next) => {
   try {
-    const { page = '1', limit = '20' } = req.query;
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10));
+    const limitNum = Math.min(100, Math.max(1, Number.parseInt(String(req.query.limit || '20'), 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Get user's subscriptions
     const subscriptions = await prisma.subscription.findMany({
       where: { userId: req.user!.userId },
       select: { id: true },
     });
-
     const subscriptionIds = subscriptions.map((s) => s.id);
 
     const [payments, total] = await Promise.all([
       prisma.payment.findMany({
-        where: {
-          subscriptionId: { in: subscriptionIds },
-        },
+        where: { subscriptionId: { in: subscriptionIds } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limitNum,
       }),
-      prisma.payment.count({
-        where: {
-          subscriptionId: { in: subscriptionIds },
-        },
-      }),
+      prisma.payment.count({ where: { subscriptionId: { in: subscriptionIds } } }),
     ]);
 
     res.json({
       success: true,
       data: payments,
-      meta: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        timestamp: new Date().toISOString(),
-      },
+      meta: { page: pageNum, limit: limitNum, total, timestamp: new Date().toISOString() },
     });
   } catch (error) {
     next(error);
@@ -238,110 +154,113 @@ router.get('/history', authenticate, async (req, res, next) => {
 });
 
 /**
- * Initialize SimplyBlu payment
- * POST /api/v1/payments/simplyblu/initiate
- * 
- * SimplyBlu is Standard Bank's white-label payment solution powered by Mastercard.
- * This endpoint creates a payment session and returns a checkout URL.
+ * Initialize a real SimplyBlu payment.
+ * Never returns a simulated checkout URL.
  */
 router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
   try {
     const { amount, currency = 'ZAR', description, packageId, metadata } = req.body;
 
-    if (!amount || !description || !packageId) {
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || !description || !packageId) {
       throw createError('Amount, description, and packageId are required', 400, 'MISSING_FIELDS');
     }
 
-    // Validate SimplyBlu credentials are configured
-    if (!SIMPLYBLU_PUBLIC_KEY || !SIMPLYBLU_PRIVATE_KEY) {
-      logger.warn('SimplyBlu payment attempted but API keys not configured');
+    if (!simplyBluConfigured) {
       throw createError(
-        'Payment provider not configured. Please contact support.',
+        'SimplyBlu is not configured for this deployment. No payment has been created.',
         503,
         'PAYMENT_PROVIDER_NOT_CONFIGURED'
       );
     }
 
-    // Create a pending subscription for the user
+    const amountInCents = Math.round(Number(amount) * 100);
+
     const subscription = await prisma.subscription.create({
       data: {
         userId: req.user!.userId,
         packageType: packageId,
         status: 'PENDING',
         billingCycle: metadata?.billingCycle || 'monthly',
-        amount: amount / 100, // Convert cents to main currency unit
+        amount: Number(amount),
         currency,
-        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
-    // Create payment record
     const payment = await prisma.payment.create({
       data: {
         subscriptionId: subscription.id,
-        amount: amount / 100,
+        amount: Number(amount),
         currency,
         status: 'PENDING',
         paymentMethod: 'simplyblu',
-        transactionId: `sb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        transactionId: `sb_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
       },
     });
 
-    let checkoutUrl: string | null = null;
-    let simplifyData: any = null;
-
-    // Create payment with SimplyBlu API (Simplify Commerce)
     try {
       const apiResponse = await axios.post(
-        `${SIMPLYBLU_API_URL}/payment`,
+        `${SIMPLYBLU_API_URL.replace(/\/$/, '')}/payment`,
         {
-          amount: amount, // amount in cents
-          currency: currency === 'ZAR' ? 'ZAR' : currency,
-          description: description,
+          amount: amountInCents,
+          currency,
+          description,
           reference: payment.transactionId,
-          redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment/success?paymentId=${payment.id}`,
-          // SimplyBlu uses Basic Auth with public key as username and private key as password
+          redirectUrl: `${process.env.FRONTEND_URL || ''}/payment/success?paymentId=${payment.id}`,
         },
         {
           auth: {
             username: SIMPLYBLU_PUBLIC_KEY,
             password: SIMPLYBLU_PRIVATE_KEY,
           },
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 15000,
         }
       );
 
-      simplifyData = apiResponse.data;
-      checkoutUrl = simplifyData?.redirectUrl || simplifyData?.paymentUrl || simplifyData?.url || null;
+      const checkoutUrl =
+        apiResponse.data?.redirectUrl ||
+        apiResponse.data?.paymentUrl ||
+        apiResponse.data?.url;
+
+      if (typeof checkoutUrl !== 'string' || !checkoutUrl.startsWith('https://')) {
+        logger.error(`SimplyBlu returned no valid checkout URL for payment ${payment.id}`);
+        throw createError('Payment provider returned no valid checkout URL', 502, 'INVALID_PROVIDER_RESPONSE');
+      }
+
       logger.info(`SimplyBlu payment initiated: ${payment.id}`);
-    } catch (apiError: any) {
-      logger.error('SimplyBlu API error:', apiError?.response?.data || apiError.message);
-      // If SimplyBlu API call fails, we still return the payment record so the user can retry
-      // In production, you may want to handle this differently
-    }
 
-    // Fallback: If SimplyBlu API doesn't return a URL, generate a simulated checkout URL
-    // This is useful for testing when API credentials are not yet configured
-    if (!checkoutUrl) {
-      checkoutUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/checkout/${payment.id}?provider=simplyblu`;
-      logger.info(`Using fallback checkout URL for payment: ${payment.id}`);
-    }
+      res.json({
+        success: true,
+        data: {
+          paymentId: payment.id,
+          transactionId: payment.transactionId,
+          status: payment.status,
+          amount: payment.amount,
+          currency: payment.currency,
+          checkoutUrl,
+          provider: 'simplyblu',
+        },
+        meta: { timestamp: new Date().toISOString() },
+      });
+    } catch (providerError: any) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'FAILED' },
+      });
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { status: 'CANCELLED' },
+      });
 
-    res.json({
-      success: true,
-      data: {
-        paymentId: payment.id,
-        transactionId: payment.transactionId,
-        status: payment.status,
-        amount: payment.amount,
-        currency: payment.currency,
-        checkoutUrl,
-        provider: 'simplyblu',
-      },
-      meta: { timestamp: new Date().toISOString() },
-    });
+      logger.error('SimplyBlu payment initiation failed', providerError?.response?.data || providerError?.message);
+
+      if (providerError?.statusCode) {
+        throw providerError;
+      }
+
+      throw createError('Payment provider could not initialize the payment', 502, 'PAYMENT_PROVIDER_ERROR');
+    }
   } catch (error) {
     next(error);
   }
