@@ -18,40 +18,44 @@ import { paymentRouter } from './routes/payments';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT || 3001);
+const frontendUrl = process.env.FRONTEND_URL;
 
-// Security middleware
+if (process.env.NODE_ENV === 'production' && !frontendUrl) {
+  throw new Error('FRONTEND_URL must be configured in production');
+}
+
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: frontendUrl || 'http://localhost:5173',
+    credentials: true,
+  })
+);
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// Global rate limiter
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // 1000 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 300 : 1000,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use(globalLimiter);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
   });
 });
 
-// API Routes - v1
 const v1Router = express.Router();
 
 v1Router.use('/auth', authRouter);
@@ -64,34 +68,22 @@ v1Router.use('/webhooks', webhookRouter);
 v1Router.use('/ai-tools', aiToolsRouter);
 v1Router.use('/whatsapp', whatsappRouter);
 
-// Mount v1 API
 app.use('/api/v1', v1Router);
 
-// Error handling
 app.use(errorHandler);
 
-// 404 handler
 app.use((req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Route not found',
     path: req.path,
     method: req.method,
-    availableVersions: ['/api/v1']
+    availableVersions: ['/api/v1'],
   });
 });
 
 app.listen(PORT, () => {
-  logger.info(`🚀 C6GROUP API Server running on port ${PORT}`);
-  logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`🔑 Auth: /api/v1/auth`);
-  logger.info(`🤖 AI: /api/v1/ai`);
-  logger.info(`👤 Users: /api/v1/users`);
-  logger.info(`💳 Subscriptions: /api/v1/subscriptions`);
-  logger.info(`💰 Payments: /api/v1/payments`);
-  logger.info(`📊 Analytics: /api/v1/analytics`);
-  logger.info(`🤖 AI Tools: /api/v1/ai-tools`);
-  logger.info(`💬 WhatsApp: /api/v1/whatsapp`);
-  logger.info(`🔗 Webhooks: /api/v1/webhooks`);
+  logger.info(`C6GROUP API Server running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 export default app;

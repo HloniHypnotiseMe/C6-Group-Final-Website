@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { calculateAuditResults } from '@/lib/utils';
 import { aiApi } from '@/services/api';
 import { toast } from 'sonner';
 import {
@@ -91,6 +90,7 @@ export function Audit() {
   const generateReport = async () => {
     if (!validateStep()) return;
     setIsSubmitting(true);
+    setErrors({});
 
     try {
       const response = await aiApi.runAudit({
@@ -112,44 +112,41 @@ export function Audit() {
         techChallenge: formData.techChallenge,
       });
 
-      if (response.success && response.data) {
-        const d = response.data as any;
-        setResult({
-          overallScore: d.overallScore || d.overall_score || 72,
-          seoScore: d.seoScore || d.seo_score || 65,
-          currentRevenue: formData.monthlyRevenue || 0,
-          potentialRevenue: d.revenueAnalysis?.potentialMonthlyRevenue || Number(formData.monthlyRevenue) * 1.8 || 50000,
-          revenueGap: d.revenueAnalysis?.revenueGap || 20000,
-          conversionRate: parseFloat(formData.conversionRate) || 8,
-          potentialConversion: d.potentialConversion || 20,
-          recommendations: {
-            seo: Array.isArray(d.recommendations?.immediate) ? d.recommendations.immediate.slice(0, 3).map((r: any) => r.action || r) : ['Optimize website meta descriptions', 'Add alt text to all images', 'Submit XML sitemap to Google'],
-            revenue: Array.isArray(d.recommendations?.shortTerm) ? d.recommendations.shortTerm.slice(0, 3).map((r: any) => r.action || r) : ['Implement abandoned cart recovery', 'Launch email marketing campaigns', 'Add upsell offers'],
-            conversion: ['Add social proof and testimonials', 'Simplify checkout process', 'Add live chat support'],
-            aiTools: d.aiToolsRecommended || ['AI Chatbot', 'SEO Analyzer', 'Email Assistant'],
-          },
-          recommendedPackage: (d.recommendedPackage || 'gold').toLowerCase(),
-          actionPlan: Array.isArray(d.recommendations?.immediate) ? [
-            { phase: 'Immediate Actions (Week 1-2)', tasks: d.recommendations.immediate.slice(0, 3).map((r: any) => r.action || r) },
-            { phase: 'Short Term (Month 1-3)', tasks: d.recommendations.shortTerm?.slice(0, 3).map((r: any) => r.action || r) || ['Optimize website conversion', 'Set up marketing automation'] },
-            { phase: 'Long Term (3-12 Months)', tasks: d.recommendations.longTerm?.slice(0, 3).map((r: any) => r.action || r) || ['Expand product offerings', 'Build referral program'] },
-          ] : [
-            { phase: 'Immediate Actions (Week 1-2)', tasks: ['Set up AI chatbot', 'Optimize website for mobile', 'Add clear CTAs'] },
-            { phase: 'Short Term (Month 1-3)', tasks: ['Launch email marketing automation', 'Implement SEO improvements', 'Set up retargeting ads'] },
-            { phase: 'Long Term (3-12 Months)', tasks: ['Expand to new market segments', 'Build customer loyalty program', 'Implement advanced analytics'] },
-          ],
-        });
-        toast.success('AI Business Audit Complete!');
-      } else throw new Error(response.error || 'Audit failed');
-    } catch (err: any) {
-      console.log('API unavailable, using local engine:', err.message);
-      await new Promise((r) => setTimeout(r, 1200));
-      setResult(calculateAuditResults(formData as any));
-      toast.info('Audit completed using local engine');
-    }
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'The AI audit service did not return a valid report.');
+      }
 
-    setShowResults(true);
-    setIsSubmitting(false);
+      const d = response.data as any;
+      setResult({
+        overallScore: d.overallScore ?? d.overall_score,
+        seoScore: d.seoScore ?? d.seo_score,
+        currentRevenue: formData.monthlyRevenue,
+        potentialRevenue: d.revenueAnalysis?.potentialMonthlyRevenue,
+        revenueGap: d.revenueAnalysis?.revenueGap,
+        conversionRate: parseFloat(formData.conversionRate) || undefined,
+        potentialConversion: d.potentialConversion,
+        recommendations: {
+          seo: Array.isArray(d.recommendations?.immediate) ? d.recommendations.immediate.slice(0, 3).map((r: any) => r.action || r) : [],
+          revenue: Array.isArray(d.recommendations?.shortTerm) ? d.recommendations.shortTerm.slice(0, 3).map((r: any) => r.action || r) : [],
+          conversion: Array.isArray(d.recommendations?.conversion) ? d.recommendations.conversion.slice(0, 3).map((r: any) => r.action || r) : [],
+          aiTools: Array.isArray(d.aiToolsRecommended) ? d.aiToolsRecommended : [],
+        },
+        recommendedPackage: typeof d.recommendedPackage === 'string' ? d.recommendedPackage.toLowerCase() : undefined,
+        actionPlan: Array.isArray(d.recommendations?.immediate) ? [
+          { phase: 'Immediate Actions (Week 1-2)', tasks: d.recommendations.immediate.slice(0, 3).map((r: any) => r.action || r) },
+          { phase: 'Short Term (Month 1-3)', tasks: Array.isArray(d.recommendations.shortTerm) ? d.recommendations.shortTerm.slice(0, 3).map((r: any) => r.action || r) : [] },
+          { phase: 'Long Term (3-12 Months)', tasks: Array.isArray(d.recommendations.longTerm) ? d.recommendations.longTerm.slice(0, 3).map((r: any) => r.action || r) : [] },
+        ] : [],
+      });
+      toast.success('AI Business Audit Complete!');
+      setShowResults(true);
+    } catch (err: any) {
+      console.error('AI Business Audit failed:', err);
+      setErrors({ submit: err?.message || 'The AI audit could not be completed. Please try again.' });
+      toast.error('AI Business Audit unavailable. No synthetic report was generated.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const reset = () => { setStep(1); setFormData(INITIAL); setShowResults(false); setResult(null); setErrors({}); };
@@ -162,7 +159,6 @@ export function Audit() {
       <main className="pt-24 pb-20">
         <div className="container-max section-padding">
           <div className="max-w-2xl mx-auto">
-            {/* Header */}
             <div className="text-center mb-10">
               <span className="eyebrow mb-3 inline-block">Free AI Audit</span>
               <h1 className="mb-3">AI Business Audit</h1>
@@ -171,7 +167,6 @@ export function Audit() {
 
             <ProgressBar step={step} total={totalSteps} />
 
-            {/* Step indicator */}
             <div className="flex items-center justify-center gap-2 mb-8">
               {Array.from({ length: totalSteps }).map((_, i) => (
                 <div key={i} className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
@@ -183,7 +178,6 @@ export function Audit() {
               ))}
             </div>
 
-            {/* Form Card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
               {step === 1 && <Step1Business formData={formData} update={update} toggleArray={toggleArray} errors={errors} />}
               {step === 2 && <Step2Online formData={formData} update={update} toggleArray={toggleArray} errors={errors} />}
@@ -191,11 +185,15 @@ export function Audit() {
               {step === 4 && <Step4Challenges formData={formData} update={update} toggleArray={toggleArray} />}
               {step === 5 && <Step5Tech formData={formData} update={update} toggleArray={toggleArray} />}
 
-              {/* Navigation */}
+              {errors.submit && (
+                <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                  {errors.submit}
+                </div>
+              )}
+
               <div className="flex justify-between mt-8 pt-6 border-t border-slate-100">
-                <Button variant="outline" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1}
-                  className="border-slate-200 text-slate-600 hover:bg-slate-50"
-                >
+                <Button variant="outline" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1 || isSubmitting}
+                  className="border-slate-200 text-slate-600 hover:bg-slate-50">
                   <ChevronLeft className="w-4 h-4 mr-1" /> Previous
                 </Button>
                 {step < totalSteps ? (
@@ -219,7 +217,6 @@ export function Audit() {
   );
 }
 
-/* ── Step Components ── */
 function Step1Business({ formData, update, errors }: any) {
   return (
     <div className="space-y-5">
@@ -351,16 +348,11 @@ function Step4Challenges({ formData, toggleArray }: any) {
       <p className="text-sm text-slate-600">Select all that apply to your business.</p>
       <div className="grid grid-cols-1 gap-2">
         {[
-          ['Getting new customers', 'Megaphone'],
-          ['Managing cash flow', 'CreditCard'],
-          ['Building online presence', 'Globe'],
-          ['Competing with larger businesses', 'Users'],
-          ['Finding skilled staff', 'Users'],
-          ['Managing time effectively', 'Clock'],
-          ['Marketing on a budget', 'TrendingUp'],
-          ['Customer retention', 'MessageSquare'],
-          ['Technology adoption', 'Wrench'],
-          ['Regulatory compliance', 'Shield'],
+          ['Getting new customers', 'Megaphone'], ['Managing cash flow', 'CreditCard'],
+          ['Building online presence', 'Globe'], ['Competing with larger businesses', 'Users'],
+          ['Finding skilled staff', 'Users'], ['Managing time effectively', 'Clock'],
+          ['Marketing on a budget', 'TrendingUp'], ['Customer retention', 'MessageSquare'],
+          ['Technology adoption', 'Wrench'], ['Regulatory compliance', 'Shield'],
         ].map(([label]) => (
           <button key={label} onClick={() => toggleArray('challenges', label)}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all ${
@@ -405,7 +397,6 @@ function Step5Tech({ formData, update, toggleArray }: any) {
   );
 }
 
-/* ── Results ── */
 function AuditResult({ result, onReset }: { result: any; onReset: () => void }) {
   const scoreColor = result.overallScore >= 80 ? 'text-emerald-600' : result.overallScore >= 60 ? 'text-amber-500' : 'text-red-500';
   const scoreBg = result.overallScore >= 80 ? 'bg-emerald-50' : result.overallScore >= 60 ? 'bg-amber-50' : 'bg-red-50';
@@ -416,14 +407,12 @@ function AuditResult({ result, onReset }: { result: any; onReset: () => void }) 
       <main className="pt-24 pb-20">
         <div className="container-max section-padding">
           <div className="max-w-4xl mx-auto">
-            {/* Header */}
             <div className="text-center mb-10">
               <span className="eyebrow mb-3 inline-block">Audit Complete</span>
               <h1 className="mb-3">Your AI Business Audit Results</h1>
               <p className="text-slate-600">Personalised growth analysis and actionable recommendations.</p>
             </div>
 
-            {/* Score Cards */}
             <div className="grid md:grid-cols-3 gap-4 mb-10">
               <div className={`${scoreBg} rounded-xl p-6 text-center`}>
                 <p className="text-sm text-slate-500 mb-1">Overall Score</p>
@@ -437,12 +426,11 @@ function AuditResult({ result, onReset }: { result: any; onReset: () => void }) 
               </div>
               <div className="bg-emerald-50 rounded-xl p-6 text-center">
                 <p className="text-sm text-slate-500 mb-1">Potential Revenue</p>
-                <p className="text-2xl font-bold text-emerald-600">R{Number(result.potentialRevenue).toLocaleString()}</p>
-                <p className="text-xs text-emerald-600 mt-1 font-medium">+R{Number(result.revenueGap).toLocaleString()} /mo</p>
+                <p className="text-2xl font-bold text-emerald-600">{result.potentialRevenue != null ? `R${Number(result.potentialRevenue).toLocaleString()}` : 'Not estimated'}</p>
+                {result.revenueGap != null && <p className="text-xs text-emerald-600 mt-1 font-medium">+R{Number(result.revenueGap).toLocaleString()} /mo</p>}
               </div>
             </div>
 
-            {/* Recommendations */}
             <div className="space-y-6 mb-10">
               <div className="card-clean">
                 <div className="flex items-center gap-2 mb-4">
@@ -473,7 +461,6 @@ function AuditResult({ result, onReset }: { result: any; onReset: () => void }) 
                 </div>
               </div>
 
-              {/* Action Plan */}
               <div className="card-clean">
                 <div className="flex items-center gap-2 mb-4">
                   <Rocket className="w-5 h-5 text-emerald-600" />
@@ -495,11 +482,10 @@ function AuditResult({ result, onReset }: { result: any; onReset: () => void }) 
                 </div>
               </div>
 
-              {/* Recommended Package */}
               <div className="bg-slate-900 rounded-2xl p-6 text-white">
-                <h3 className="text-lg font-semibold mb-2">Recommended Package: <span className="text-emerald-400 capitalize">{result.recommendedPackage}</span></h3>
+                <h3 className="text-lg font-semibold mb-2">Recommended Package: <span className="text-emerald-400 capitalize">{result.recommendedPackage || 'To be determined'}</span></h3>
                 <p className="text-slate-300 text-sm mb-4">
-                  Based on your audit, the {result.recommendedPackage} package provides the AI tools and support you need to achieve your growth targets.
+                  Your package recommendation is based on the completed AI audit. If no package was returned, no package is being invented on the client.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link to="/packages" className="btn-primary bg-emerald-600 hover:bg-emerald-500 inline-flex">
