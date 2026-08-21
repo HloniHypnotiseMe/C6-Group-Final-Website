@@ -37,3 +37,28 @@ Canonical source: `c6group-backend/src/config/commercialCatalog.ts`
 Version: `2026-08-21.v1`
 
 Commit: `fe20e7323e1f7369aa8b59b06c004a7015c9719e`
+
+---
+
+## 2026-08-21 — Intelligence → SKU Offer Contract v1
+
+**Decision:** Add a deterministic, evidence-gated commercial offer engine between Discovery Intelligence and checkout.
+
+**Implementation:** `c6group-backend/src/services/commercialOfferEngine.ts`
+
+**Tests:** `c6group-backend/src/services/commercialOfferEngine.test.ts`
+
+### Rules
+
+1. Intelligence supplies typed business signals with confidence values.
+2. The engine maps signals to an approved SKU; it does not invent pricing.
+3. Confidence below 0.70 blocks a paid recommendation and returns `INSUFFICIENT_EVIDENCE`.
+4. Enterprise requires an explicit enterprise signal and remains subject to commercial approval before self-serve checkout.
+5. The engine emits reason codes and the evidence keys used for the recommendation.
+6. The payment layer must consume the canonical catalogue price after this contract; it must never accept an AI-generated amount.
+
+**Decision:** APPROVED — proceed to offer-contract integration and checkout handoff.
+
+**Implementation commits:**
+- `28ba9fc56130cc5fb1d11000e2fbe16db21ece6`
+- `31fba201030180673efe4c5120290c51a3bc95f8`
