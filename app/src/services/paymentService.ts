@@ -1,16 +1,17 @@
 /**
- * Payment Service - Frontend API client for payment operations
- * 
- * This service handles all payment-related API calls to the backend,
- * including SimplyBlu payment initialization, status checks, and history.
+ * Payment Service - frontend API client.
+ *
+ * The C6 website talks only to the C6 backend payment boundary. The backend
+ * routes payment creation to RemotePay Fintech Services; provider details do
+ * not belong in the frontend.
  */
 
 export interface PaymentInitiateRequest {
   amount: number;
-  currency: string;
+  currency?: string;
   description: string;
   packageId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PaymentInitiateResponse {
@@ -19,7 +20,9 @@ export interface PaymentInitiateResponse {
     paymentId: string;
     transactionId: string;
     checkoutUrl: string;
+    paymentUrl?: string;
     status: string;
+    provider?: 'remotepay';
   };
   error?: {
     message: string;
@@ -31,7 +34,7 @@ export interface PaymentStatusResponse {
   success: boolean;
   data?: {
     paymentId: string;
-    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+    status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
     amount: number;
     currency: string;
     paymentMethod: string;
@@ -46,74 +49,71 @@ function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('token');
   return {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
-/**
- * Initialize a SimplyBlu payment
- */
-export async function initiateSimplyBluPayment(
+/** Create a payment through the C6 -> RemotePay boundary. */
+export async function initiateRemotePayPayment(
   request: PaymentInitiateRequest
 ): Promise<PaymentInitiateResponse> {
-  const response = await fetch(`${API_BASE}/payments/simplyblu/initiate`, {
+  const response = await fetch(`${API_BASE}/payments`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify(request),
+    body: JSON.stringify({
+      amount: request.amount,
+      currency: request.currency || 'ZAR',
+      description: request.description,
+      paymentMethod: 'remote-pay',
+      metadata: {
+        ...request.metadata,
+        packageId: request.packageId,
+      },
+    }),
   });
 
   return response.json();
 }
 
-/**
- * Get payment status by ID
- */
+/** @deprecated Use initiateRemotePayPayment. */
+export const initiateSimplyBluPayment = initiateRemotePayPayment;
+
 export async function getPaymentStatus(paymentId: string): Promise<PaymentStatusResponse> {
   const response = await fetch(`${API_BASE}/payments/${paymentId}/status`, {
     headers: getAuthHeaders(),
   });
-
   return response.json();
 }
 
-/**
- * Get payment history for the current user
- */
 export async function getPaymentHistory(page: number = 1, limit: number = 20) {
   const response = await fetch(
     `${API_BASE}/payments/history?page=${page}&limit=${limit}`,
     { headers: getAuthHeaders() }
   );
-
   return response.json();
 }
 
-/**
- * Get available payment methods
- */
 export async function getPaymentMethods() {
   const response = await fetch(`${API_BASE}/payments/methods`, {
     headers: getAuthHeaders(),
   });
-
   return response.json();
 }
 
-/**
- * Create a generic payment (for backward compatibility)
- */
 export async function createPayment(paymentData: {
   amount: number;
   currency?: string;
-  paymentMethod: string;
+  paymentMethod?: string;
   description: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }) {
   const response = await fetch(`${API_BASE}/payments`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify(paymentData),
+    body: JSON.stringify({
+      ...paymentData,
+      paymentMethod: 'remote-pay',
+    }),
   });
-
   return response.json();
 }
