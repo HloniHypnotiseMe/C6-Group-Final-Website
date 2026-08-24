@@ -1,0 +1,117 @@
+# C6 Group Commercial Lock — Sprint Tracker
+
+**Scope:** `C6-Group-Final-Website` only, with integration contracts to RemotePay and Ubernie.
+
+**Canonical source:** GitHub `main` until the website is cloned locally for runtime verification.
+
+**Commercial destination:** C6 Group is the parent commercial brand; Ubernie is a business operating/intelligence product; RemotePay Fintech Services is the current payment entity and payment rail used by C6/Ubernie/other verticals and external merchants.
+
+## Phase 0 — Baseline & forensic lock
+
+- [x] Confirm canonical GitHub repository.
+- [x] Confirm React/Vite frontend and Express/Prisma backend.
+- [x] Identify existing `/audit`, `/packages`, `/ai-tools`, dashboard and account flows.
+- [x] Identify current SimplyBlu payment component and backend initiation boundary.
+- [x] Identify current commercial prices shown on the site.
+- [x] Identify current trust/payment-provider language.
+- [ ] Clone locally after GitHub changes stabilize.
+- [ ] Run install/build/lint/tests locally and record evidence.
+
+## Phase 1 — Commercial positioning lock
+
+- [ ] Define one clear C6 Group proposition above the product catalogue.
+- [ ] Present C6 as the parent ecosystem/brand without implying unincorporated subsidiaries are separate legal entities.
+- [ ] Position Ubernie as the business intelligence / operating product.
+- [ ] Position RemotePay Fintech Services as the current payment entity/rail.
+- [ ] Add a clear ecosystem relationship section: C6 → Ubernie / RemotePay / other verticals.
+- [ ] Remove conflicting or outdated provider language from customer-facing C6 copy.
+- [ ] Ensure every primary CTA maps to a measurable commercial next step.
+
+## Phase 2 — Offer architecture & pricing
+
+- [ ] Audit all offers, packages and AI tools for duplication/overlap.
+- [ ] Build a single canonical product catalogue.
+- [ ] Separate free lead-generation offers from paid products.
+- [ ] Re-engineer pricing against acquisition cost, delivery cost, recurring value and R1M/day scale.
+- [ ] Define entry, growth and enterprise paths.
+- [ ] Ensure pricing shown in homepage and packages page cannot drift.
+- [ ] Add internal product IDs/offer IDs where payment attribution requires them.
+
+## Phase 3 — Audit → recommendation → sale funnel
+
+- [ ] Audit intake.
+- [ ] Business diagnosis.
+- [ ] Recommendation engine/output.
+- [ ] Recommended product/package.
+- [ ] Checkout/payment initiation.
+- [ ] Payment confirmation.
+- [ ] Fulfilment/onboarding.
+- [ ] Recurring revenue lifecycle.
+- [ ] Event/attribution tracking across the funnel.
+
+## Phase 4 — RemotePay commercial integration
+
+- [ ] Make RemotePay the C6-facing payment boundary.
+- [ ] Keep current processor behind RemotePay/provider adapter architecture.
+- [ ] Pass brand, product, offer and customer attribution into payment creation.
+- [ ] Replace direct SimplyBlu naming in the merchant-facing architecture where RemotePay is the commercial layer.
+- [ ] Preserve SimplyBlu as the current underlying processor only where technically accurate.
+- [ ] Verify webhook → transaction lifecycle → settlement/reconciliation path.
+- [ ] Ensure refunds and adjustments retain original transaction attribution.
+
+## Phase 5 — Ubernie integration
+
+- [ ] Link C6 recommendation outputs to Ubernie where appropriate.
+- [ ] Define exact handoff contract between C6 and Ubernie.
+- [ ] Ensure Ubernie payment events identify Ubernie as the brand/product beneficiary while RemotePay remains the payment rail/entity.
+- [ ] Avoid duplicating business-audit logic between C6 and Ubernie.
+
+## Phase 6 — Trust, legal & conversion
+
+- [ ] Verify POPIA/privacy/cookie/terms surfaces.
+- [ ] Verify company/entity/payment disclosures are accurate.
+- [ ] Remove unsupported claims.
+- [ ] Verify WhatsApp/contact channels.
+- [ ] Add appropriate payment/security language.
+- [ ] Ensure no test/payment credentials appear in frontend source.
+
+## Phase 7 — Runtime verification
+
+- [ ] Clone canonical repo locally.
+- [ ] Install dependencies.
+- [ ] Build frontend.
+- [ ] Lint frontend.
+- [ ] Build/start backend.
+- [ ] Run application smoke tests.
+- [ ] Test audit flow.
+- [ ] Test package selection.
+- [ ] Test payment initiation in sandbox/test mode.
+- [ ] Verify webhook handling.
+- [ ] Verify attribution and state transitions.
+- [ ] Capture evidence package.
+
+## Phase 8 — Launch gate
+
+- [ ] Commercial copy locked.
+- [ ] Product catalogue locked.
+- [ ] Pricing locked.
+- [ ] RemotePay routing locked.
+- [ ] Ubernie handoff locked.
+- [ ] Runtime tests green.
+- [ ] Security gate green.
+- [ ] Payment sandbox evidence green.
+- [ ] Production configuration reviewed.
+- [ ] Only then clone/align local production workspace.
+
+## Current blockers / findings
+
+1. The frontend currently presents C6 as an AI-powered business intelligence ecosystem and already has audit, packages, dashboard and AI-tools routes.
+2. Homepage currently shows package prices of Free, R499/month and R1,499/month.
+3. The packages page uses `SimplyBluPaymentButton` directly for paid packages.
+4. The payment component calls `/api/v1/payments/simplyblu/initiate`, which means the current website payment boundary is processor-specific rather than RemotePay-branded.
+5. The homepage trust logos still include `PayFast`, which conflicts with the current RemotePay-first commercial direction.
+6. The repository contains generated `app/dist` content and a `Thumbs.db`; cleanup is a separate repository hygiene task and must not break deployment.
+
+## Operating rule
+
+**Do not implement speculative integrations.** Every change must be tied to a tracker item, tested where possible, and recorded in Git history. No live-money claim is made until the RemotePay production verification gate is satisfied.
