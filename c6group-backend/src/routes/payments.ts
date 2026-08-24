@@ -7,69 +7,89 @@ import axios from 'axios';
 
 const router = Router();
 
-// RemotePay API configuration
-const REMOTEPAY_API_URL = process.env.REMOTEPAY_API_URL || 'https://api.remotepay.co.za/v1';
+const REMOTEPAY_API_URL = (process.env.REMOTEPAY_API_URL || 'https://api.remotepay.co.za/v1').replace(/\/$/, '');
 const REMOTEPAY_API_KEY = process.env.REMOTEPAY_API_KEY || '';
 const REMOTEPAY_MERCHANT_ID = process.env.REMOTEPAY_MERCHANT_ID || '';
+const REMOTEPAY_BRAND_ID = process.env.REMOTEPAY_BRAND_ID || 'c6-group';
 
-// SimplyBlu (Standard Bank / Mastercard Simplify Commerce) API configuration
-const SIMPLYBLU_API_URL = process.env.SIMPLYBLU_API_URL || 'https://sandbox.simplify.com/v1';
-const SIMPLYBLU_PUBLIC_KEY = process.env.SIMPLYBLU_PUBLIC_KEY || '';
-const SIMPLYBLU_PRIVATE_KEY = process.env.SIMPLYBLU_PRIVATE_KEY || '';
-const SIMPLYBLU_MERCHANT_EMAIL = process.env.SIMPLYBLU_MERCHANT_EMAIL || '';
+interface RemotePayPaymentLink {
+  payment_id: string;
+  transaction_id: string;
+  status: string;
+  payment_url: string;
+  currency: string;
+  amount_minor: number;
+  merchant_id: string;
+  brand_id: string;
+}
 
-/**
- * Get available payment methods
- * GET /api/v1/payments/methods
- */
-router.get('/methods', authenticate, async (req, res, next) => {
+function requireRemotePayConfiguration() {
+  if (!REMOTEPAY_API_KEY || !REMOTEPAY_MERCHANT_ID) {
+    throw createError(
+      'RemotePay payment service is not configured. Please contact support.',
+      503,
+      'REMOTEPAY_NOT_CONFIGURED'
+    );
+  }
+}
+
+async function createRemotePayPaymentLink(params: {
+  amountMinor: number;
+  currency: string;
+  description: string;
+  packageId?: string;
+  userId: string;
+  paymentId: string;
+  billingCycle?: string;
+}) {
+  requireRemotePayConfiguration();
+
+  const response = await axios.post<RemotePayPaymentLink>(
+    `${REMOTEPAY_API_URL}/payment-links`,
+    {
+      merchant_id: REMOTEPAY_MERCHANT_ID,
+      brand_id: REMOTEPAY_BRAND_ID,
+      source_system: 'c6-group-website',
+      customer_reference: params.userId,
+      product_id: params.packageId,
+      description: params.description,
+      amount_minor: params.amountMinor,
+      currency: params.currency,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment/success?paymentId=${params.paymentId}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/packages`,
+      idempotency_key: `c6-payment-${params.paymentId}`,
+      metadata: {
+        payment_id: params.paymentId,
+        user_id: params.userId,
+        package_id: params.packageId || '',
+        billing_cycle: params.billingCycle || '',
+      },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${REMOTEPAY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+
+  return response.data;
+}
+
+router.get('/methods', authenticate, async (_req, res, next) => {
   try {
-    const methods = [
-      {
-        id: 'card',
-        name: 'Credit/Debit Card',
-        description: 'Visa, Mastercard, American Express',
-        icon: 'credit-card',
-        enabled: true,
-        processingFee: '2.9% + R1.50',
-      },
-      {
-        id: 'instant_eft',
-        name: 'Instant EFT',
-        description: 'Ozow, PayFast EFT',
-        icon: 'bank',
-        enabled: true,
-        processingFee: '1.5% + R2.00',
-      },
-      {
-        id: 'snapscan',
-        name: 'SnapScan',
-        description: 'Scan QR code with SnapScan app',
-        icon: 'qr-code',
-        enabled: true,
-        processingFee: '2.9%',
-      },
-      {
-        id: 'zapper',
-        name: 'Zapper',
-        description: 'Scan QR code with Zapper app',
-        icon: 'qr-code',
-        enabled: true,
-        processingFee: '2.9%',
-      },
-      {
-        id: 'debit_order',
-        name: 'Debit Order',
-        description: 'Monthly automatic debit order',
-        icon: 'repeat',
-        enabled: true,
-        processingFee: 'R0',
-      },
-    ];
-
     res.json({
       success: true,
-      data: methods,
+      data: [
+        {
+          id: 'remote-pay',
+          name: 'RemotePay',
+          description: 'Secure payment checkout through RemotePay Fintech Services',
+          icon: 'credit-card',
+          enabled: true,
+        },
+      ],
       meta: { timestamp: new Date().toISOString() },
     });
   } catch (error) {
@@ -78,96 +98,103 @@ router.get('/methods', authenticate, async (req, res, next) => {
 });
 
 /**
- * Create a payment
- * POST /api/v1/payments
+ * Create a C6 payment through the RemotePay payment-link boundary.
+ * C6 never calls an underlying processor directly.
  */
 router.post('/', authenticate, async (req, res, next) => {
   try {
-    const { amount, currency = 'ZAR', paymentMethod, description, metadata } = req.body;
+    const {
+      amount,
+      currency = 'ZAR',
+      description,
+      paymentMethod = 'remote-pay',
+      metadata = {},
+    } = req.body;
 
-    if (!amount || !paymentMethod) {
-      throw createError('Amount and payment method are required', 400, 'MISSING_FIELDS');
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || !description) {
+      throw createError('A positive amount and description are required', 400, 'MISSING_FIELDS');
     }
 
-    // Create payment record
+    const packageId = metadata.packageId || metadata.package_id;
+    const subscriptionId = metadata.subscriptionId || metadata.subscription_id;
+
+    let resolvedSubscriptionId = subscriptionId;
+    if (!resolvedSubscriptionId && packageId) {
+      const subscription = await prisma.subscription.create({
+        data: {
+          userId: req.user!.userId,
+          packageId,
+          status: 'PENDING',
+          billingCycle: metadata.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY',
+          nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+      resolvedSubscriptionId = subscription.id;
+    }
+
+    if (!resolvedSubscriptionId) {
+      throw createError('A subscription or packageId is required', 400, 'SUBSCRIPTION_REQUIRED');
+    }
+
     const payment = await prisma.payment.create({
       data: {
-        subscriptionId: metadata?.subscriptionId || 'pending',
-        amount: amount,
+        subscriptionId: resolvedSubscriptionId,
+        amount: Number(amount),
         currency,
         status: 'PENDING',
         paymentMethod,
-        transactionId: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       },
     });
 
-    // If RemotePay is configured, create payment with their API
-    let remotePayData = null;
-    if (REMOTEPAY_API_KEY) {
-      try {
-        const remotePayResponse = await axios.post(
-          `${REMOTEPAY_API_URL}/transactions`,
-          {
-            merchant_id: REMOTEPAY_MERCHANT_ID,
-            amount: amount * 100, // cents
-            currency,
-            description,
-            payment_method: paymentMethod,
-            callback_url: `${process.env.API_URL}/api/v1/webhooks/remotepay`,
-            metadata: {
-              ...metadata,
-              paymentId: payment.id,
-              userId: req.user!.userId,
-            },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${REMOTEPAY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-        remotePayData = remotePayResponse.data;
-      } catch (apiError) {
-        logger.error('RemotePay API error:', apiError);
-      }
-    }
-
-    logger.info(`Payment created: ${payment.id} for user: ${req.user!.userId}`);
-
-    res.json({
-      success: true,
-      data: {
+    try {
+      const remotePay = await createRemotePayPaymentLink({
+        amountMinor: Math.round(Number(amount) * 100),
+        currency,
+        description,
+        packageId,
+        userId: req.user!.userId,
         paymentId: payment.id,
-        transactionId: payment.transactionId,
-        status: payment.status,
-        amount: payment.amount,
-        currency: payment.currency,
-        paymentUrl: remotePayData?.payment_url || null,
-        checkoutUrl: remotePayData?.checkout_url || `/checkout/${payment.id}`,
-      },
-      meta: { timestamp: new Date().toISOString() },
-    });
+        billingCycle: metadata.billingCycle,
+      });
+
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { transactionId: remotePay.transaction_id },
+      });
+
+      res.status(201).json({
+        success: true,
+        data: {
+          paymentId: payment.id,
+          transactionId: remotePay.transaction_id,
+          status: remotePay.status,
+          amount: payment.amount,
+          currency: payment.currency,
+          paymentUrl: remotePay.payment_url,
+          checkoutUrl: remotePay.payment_url,
+          provider: 'remotepay',
+          merchantId: remotePay.merchant_id,
+          brandId: remotePay.brand_id,
+        },
+        meta: { timestamp: new Date().toISOString() },
+      });
+    } catch (remotePayError: any) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'FAILED' },
+      });
+      logger.error('RemotePay payment-link creation failed', remotePayError?.response?.data || remotePayError?.message);
+      throw createError('RemotePay could not create the payment link. Please try again.', 502, 'REMOTEPAY_PAYMENT_LINK_FAILED');
+    }
   } catch (error) {
     next(error);
   }
 });
 
-/**
- * Get payment status
- * GET /api/v1/payments/:id/status
- */
 router.get('/:id/status', authenticate, async (req, res, next) => {
   try {
-    const { id } = req.params;
-
-    const payment = await prisma.payment.findUnique({
-      where: { id },
-    });
-
-    if (!payment) {
-      throw createError('Payment not found', 404, 'NOT_FOUND');
-    }
+    const payment = await prisma.payment.findUnique({ where: { id: req.params.id } });
+    if (!payment) throw createError('Payment not found', 404, 'NOT_FOUND');
 
     res.json({
       success: true,
@@ -187,50 +214,32 @@ router.get('/:id/status', authenticate, async (req, res, next) => {
   }
 });
 
-/**
- * Get payment history
- * GET /api/v1/payments/history
- */
 router.get('/history', authenticate, async (req, res, next) => {
   try {
-    const { page = '1', limit = '20' } = req.query;
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Get user's subscriptions
     const subscriptions = await prisma.subscription.findMany({
       where: { userId: req.user!.userId },
       select: { id: true },
     });
-
     const subscriptionIds = subscriptions.map((s) => s.id);
 
     const [payments, total] = await Promise.all([
       prisma.payment.findMany({
-        where: {
-          subscriptionId: { in: subscriptionIds },
-        },
+        where: { subscriptionId: { in: subscriptionIds } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limitNum,
       }),
-      prisma.payment.count({
-        where: {
-          subscriptionId: { in: subscriptionIds },
-        },
-      }),
+      prisma.payment.count({ where: { subscriptionId: { in: subscriptionIds } } }),
     ]);
 
     res.json({
       success: true,
       data: payments,
-      meta: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        timestamp: new Date().toISOString(),
-      },
+      meta: { page: pageNum, limit: limitNum, total, timestamp: new Date().toISOString() },
     });
   } catch (error) {
     next(error);
@@ -238,110 +247,71 @@ router.get('/history', authenticate, async (req, res, next) => {
 });
 
 /**
- * Initialize SimplyBlu payment
- * POST /api/v1/payments/simplyblu/initiate
- * 
- * SimplyBlu is Standard Bank's white-label payment solution powered by Mastercard.
- * This endpoint creates a payment session and returns a checkout URL.
+ * Legacy route retained for callers that still use the old endpoint name.
+ * It deliberately routes through RemotePay and contains no processor credentials.
  */
 router.post('/simplyblu/initiate', authenticate, async (req, res, next) => {
   try {
-    const { amount, currency = 'ZAR', description, packageId, metadata } = req.body;
-
-    if (!amount || !description || !packageId) {
+    const { amount, currency = 'ZAR', description, packageId, metadata = {} } = req.body;
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || !description || !packageId) {
       throw createError('Amount, description, and packageId are required', 400, 'MISSING_FIELDS');
     }
 
-    // Validate SimplyBlu credentials are configured
-    if (!SIMPLYBLU_PUBLIC_KEY || !SIMPLYBLU_PRIVATE_KEY) {
-      logger.warn('SimplyBlu payment attempted but API keys not configured');
-      throw createError(
-        'Payment provider not configured. Please contact support.',
-        503,
-        'PAYMENT_PROVIDER_NOT_CONFIGURED'
-      );
-    }
-
-    // Create a pending subscription for the user
     const subscription = await prisma.subscription.create({
       data: {
         userId: req.user!.userId,
-        packageType: packageId,
+        packageId,
         status: 'PENDING',
-        billingCycle: metadata?.billingCycle || 'monthly',
-        amount: amount / 100, // Convert cents to main currency unit
-        currency,
-        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        billingCycle: metadata.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY',
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
 
-    // Create payment record
     const payment = await prisma.payment.create({
       data: {
         subscriptionId: subscription.id,
-        amount: amount / 100,
+        amount: Number(amount) / 100,
         currency,
         status: 'PENDING',
-        paymentMethod: 'simplyblu',
-        transactionId: `sb_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        paymentMethod: 'remotepay',
       },
     });
 
-    let checkoutUrl: string | null = null;
-    let simplifyData: any = null;
-
-    // Create payment with SimplyBlu API (Simplify Commerce)
     try {
-      const apiResponse = await axios.post(
-        `${SIMPLYBLU_API_URL}/payment`,
-        {
-          amount: amount, // amount in cents
-          currency: currency === 'ZAR' ? 'ZAR' : currency,
-          description: description,
-          reference: payment.transactionId,
-          redirectUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment/success?paymentId=${payment.id}`,
-          // SimplyBlu uses Basic Auth with public key as username and private key as password
-        },
-        {
-          auth: {
-            username: SIMPLYBLU_PUBLIC_KEY,
-            password: SIMPLYBLU_PRIVATE_KEY,
-          },
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      simplifyData = apiResponse.data;
-      checkoutUrl = simplifyData?.redirectUrl || simplifyData?.paymentUrl || simplifyData?.url || null;
-      logger.info(`SimplyBlu payment initiated: ${payment.id}`);
-    } catch (apiError: any) {
-      logger.error('SimplyBlu API error:', apiError?.response?.data || apiError.message);
-      // If SimplyBlu API call fails, we still return the payment record so the user can retry
-      // In production, you may want to handle this differently
-    }
-
-    // Fallback: If SimplyBlu API doesn't return a URL, generate a simulated checkout URL
-    // This is useful for testing when API credentials are not yet configured
-    if (!checkoutUrl) {
-      checkoutUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/checkout/${payment.id}?provider=simplyblu`;
-      logger.info(`Using fallback checkout URL for payment: ${payment.id}`);
-    }
-
-    res.json({
-      success: true,
-      data: {
+      const remotePay = await createRemotePayPaymentLink({
+        amountMinor: Number(amount),
+        currency,
+        description,
+        packageId,
+        userId: req.user!.userId,
         paymentId: payment.id,
-        transactionId: payment.transactionId,
-        status: payment.status,
-        amount: payment.amount,
-        currency: payment.currency,
-        checkoutUrl,
-        provider: 'simplyblu',
-      },
-      meta: { timestamp: new Date().toISOString() },
-    });
+        billingCycle: metadata.billingCycle,
+      });
+
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { transactionId: remotePay.transaction_id },
+      });
+
+      res.status(201).json({
+        success: true,
+        data: {
+          paymentId: payment.id,
+          transactionId: remotePay.transaction_id,
+          status: remotePay.status,
+          amount: payment.amount,
+          currency,
+          checkoutUrl: remotePay.payment_url,
+          paymentUrl: remotePay.payment_url,
+          provider: 'remotepay',
+        },
+        meta: { timestamp: new Date().toISOString() },
+      });
+    } catch (remotePayError: any) {
+      await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } });
+      logger.error('RemotePay legacy payment-link creation failed', remotePayError?.response?.data || remotePayError?.message);
+      throw createError('RemotePay could not create the payment link. Please try again.', 502, 'REMOTEPAY_PAYMENT_LINK_FAILED');
+    }
   } catch (error) {
     next(error);
   }
