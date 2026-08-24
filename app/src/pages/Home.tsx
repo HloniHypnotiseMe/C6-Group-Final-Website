@@ -5,7 +5,7 @@ import { WhatsAppChat } from '@/components/WhatsAppChat';
 import { ArrowRight, TrendingUp, Bot, Zap, BarChart3, CheckCircle2, MessageCircle, Mail, ShieldCheck } from 'lucide-react';
 
 function TrustLogos() {
-  const logos = ['Shopify', 'WooCommerce', 'WordPress', 'Google', 'Meta', 'PayFast'];
+  const logos = ['Shopify', 'WooCommerce', 'WordPress', 'Google', 'Meta', 'RemotePay'];
   return (
     <section className="border-y border-slate-100 bg-slate-50/50">
       <div className="container-max py-8 section-padding">
@@ -100,7 +100,13 @@ function PackagesSection() {
 }
 
 function EcosystemSection() {
-  return <section className="py-20 md:py-24"><div className="container-max section-padding"><div className="max-w-4xl mx-auto rounded-2xl bg-slate-900 p-8 md:p-12 text-white"><span className="eyebrow text-emerald-400 mb-4 inline-block">The C6 Business Intelligence Layer</span><h2 className="text-white mb-4">One audit can unlock the right next move.</h2><p className="text-slate-300 text-lg leading-relaxed mb-6">C6 is being built as the intelligence layer for a wider business ecosystem: understand a business, classify its needs, recommend the right growth system, and connect the business to the right commercial opportunity.</p><div className="grid md:grid-cols-3 gap-4 text-sm"><div className="rounded-xl bg-white/5 p-4"><strong className="text-emerald-400">Understand</strong><p className="text-slate-300 mt-1">Audit the business and identify opportunities.</p></div><div className="rounded-xl bg-white/5 p-4"><strong className="text-emerald-400">Recommend</strong><p className="text-slate-300 mt-1">Match needs to practical tools and services.</p></div><div className="rounded-xl bg-white/5 p-4"><strong className="text-emerald-400">Connect</strong><p className="text-slate-300 mt-1">Create a clear next action for the business.</p></div></div></div></div></section>;
+  const ecosystem = [
+    { name: 'C6 Group', role: 'Parent commercial ecosystem', description: 'The intelligence and commercial layer that diagnoses business needs and connects customers to the right growth system.', href: '/about' },
+    { name: 'Ubernie', role: 'Business intelligence & operating product', description: 'The business-focused operating layer for audits, recommendations, growth opportunities and execution.', href: '/audit' },
+    { name: 'RemotePay', role: 'Payment infrastructure', description: 'The payment layer used by C6, Ubernie and other verticals. RemotePay Fintech Services is the current payment entity; the underlying processor remains behind the payment boundary.', href: '/packages' },
+  ];
+
+  return <section className="py-20 md:py-24"><div className="container-max section-padding"><div className="max-w-5xl mx-auto rounded-2xl bg-slate-900 p-8 md:p-12 text-white"><span className="eyebrow text-emerald-400 mb-4 inline-block">The C6 Business Ecosystem</span><h2 className="text-white mb-4">One intelligence layer. Multiple machines. One commercial path.</h2><p className="text-slate-300 text-lg leading-relaxed mb-8">C6 understands the business, recommends the right machine and connects the customer to the appropriate product. Payments are routed through RemotePay rather than forcing every C6 product to build its own payment stack.</p><div className="grid md:grid-cols-3 gap-4">{ecosystem.map((item) => <Link key={item.name} to={item.href} className="rounded-xl bg-white/5 p-5 hover:bg-white/10 transition-colors"><strong className="text-emerald-400">{item.name}</strong><p className="text-white text-sm font-semibold mt-2">{item.role}</p><p className="text-slate-300 text-sm mt-2 leading-relaxed">{item.description}</p><span className="inline-flex items-center text-emerald-400 text-sm font-medium mt-4">Explore <ArrowRight className="ml-1 w-4 h-4" /></span></Link>)}</div></div></div></section>;
 }
 
 function CTASection() {
