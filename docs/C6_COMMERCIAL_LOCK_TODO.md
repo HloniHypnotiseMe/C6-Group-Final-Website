@@ -61,6 +61,7 @@
 
 ## Phase 3 — Audit → recommendation → sale funnel
 
+- [x] Remove client-side synthetic audit fallback; AI audit now fails closed when the service does not return valid data.
 - [ ] Audit intake.
 - [ ] Business diagnosis.
 - [ ] Recommendation engine/output.
@@ -141,11 +142,12 @@
 - **Added:** C6 main now contains the RemotePay payment-link boundary directly; the older PR remains as historical review context rather than being merged over newer main commits.
 - **Evidence status:** Code-level changes committed to GitHub; real provider sandbox verification remains OPEN.
 
-### 2026-08-25 — Audit integrity gate identified
+### 2026-08-25 — Audit integrity gate
 
-- **Found:** C6's audit UI still contains a local synthetic fallback when the AI audit API fails.
-- **Required fix:** Remove synthetic results so an outreach prospect can never receive a fabricated audit.
-- **Status:** Fix exists on historical PR #1 and must be ported cleanly onto current main without overwriting the newer RemotePay payment boundary.
+- **Found:** C6's audit UI contained a local synthetic fallback when the AI audit API failed.
+- **Fixed:** Ported the verified fail-closed audit implementation onto current `main` without overwriting the newer RemotePay payment boundary.
+- **Result:** No synthetic audit report is generated when the AI audit service is unavailable.
+- **Evidence:** Commit `eab7efcef617599efbcc4942fc8d79da29c86648`.
 
 ## CURRENT BLOCKERS / FINDINGS
 
@@ -154,7 +156,6 @@
 3. Live/sandbox provider verification is still outstanding; no live-money readiness claim is made.
 4. The C6 repository still contains legacy SimplyBlu backend code; it is no longer the package-page merchant-facing path and should be removed/deprecated only after runtime verification confirms no other consumer depends on it.
 5. The repository contains generated `app/dist` content and `Thumbs.db`; cleanup is a separate repository hygiene task and must not break deployment.
-6. The C6 audit synthetic fallback is a launch blocker for outbound because an audit must be evidence-based, not invented client-side.
 
 ## OPERATING RULE
 
