@@ -1,0 +1,1 @@
+Audit integrity source port is ready from the verified historical production-integrity commit. The actual source blob will be promoted onto main without overwriting the current RemotePay payment boundary.
