@@ -6,6 +6,28 @@
 
 **Commercial destination:** C6 Group is the parent commercial brand; Ubernie is a business operating/intelligence product; RemotePay Fintech Services is the current payment entity and payment rail used by C6/Ubernie/other verticals and external merchants.
 
+## TODAY — PAYMENT-FIRST EXECUTION LANE
+
+**Objective:** Get to a demonstrably working C6 → RemotePay → SimplyBlu payment flow today, rather than spending the day on speculative architecture.
+
+**Known fact:** SimplyBlu already successfully sends payment emails, SMS and hosted payment links. The existing SimplyBlu capability is therefore treated as the current working processor rail; RemotePay's job is to become the merchant-facing orchestration/boundary around it.
+
+### Priority order
+
+1. [x] Put C6 checkout behind RemotePay.
+2. [x] Carry C6 brand/product/offer attribution into RemotePay.
+3. [x] Put SimplyBlu behind a RemotePay provider adapter.
+4. [x] Remove hardcoded payment credentials from RemotePay source configuration.
+5. [ ] Make RemotePay invoke the **known-working SimplyBlu payment-link/email/SMS capability using its real API contract** — do not invent a second checkout system.
+6. [ ] Run one sandbox/test transaction end-to-end.
+7. [ ] Verify the resulting hosted link/email/SMS and RemotePay transaction reference.
+8. [ ] Persist the transaction and provider reference before declaring the payment flow production-ready.
+9. [ ] Verify webhook/status callback and final payment state.
+10. [ ] Verify attribution: C6/Ubernie/other brand → RemotePay transaction → underlying provider transaction.
+11. [ ] Only after the above works, move to refunds, reconciliation and broader commercial polish.
+
+**Working-day rule:** If an existing capability already works, integrate to it first. Do not replace, redesign or duplicate it before proving the working path.
+
 ## Phase 0 — Baseline & forensic lock
 
 - [x] Confirm canonical GitHub repository.
@@ -56,6 +78,7 @@
 - [x] Pass brand, product, offer and customer attribution into payment creation.
 - [x] Replace direct SimplyBlu naming in the merchant-facing architecture where RemotePay is the commercial layer.
 - [x] Preserve SimplyBlu as the current underlying processor only where technically accurate.
+- [ ] Verify real SimplyBlu email/SMS/hosted-link initiation through RemotePay.
 - [ ] Verify webhook → transaction lifecycle → settlement/reconciliation path.
 - [ ] Ensure refunds and adjustments retain original transaction attribution.
 
@@ -86,6 +109,8 @@
 - [ ] Test audit flow.
 - [ ] Test package selection.
 - [ ] Test payment initiation in sandbox/test mode.
+- [ ] Verify hosted payment link.
+- [ ] Verify email/SMS delivery where enabled.
 - [ ] Verify webhook handling.
 - [ ] Verify attribution and state transitions.
 - [ ] Capture evidence package.
@@ -103,17 +128,28 @@
 - [ ] Production configuration reviewed.
 - [ ] Only then clone/align local production workspace.
 
-## Current blockers / findings
+## FIX LOG — AUTONOMOUS BOUNDED REPAIRS
 
-1. C6 paid package checkout now calls the RemotePay payment-link API directly rather than the legacy SimplyBlu endpoint.
-2. C6 payment creation carries `brand_id`, `product_id`, `offer_id`, customer reference support, and source-system metadata for attribution.
-3. RemotePay payment links now route the underlying checkout through a dedicated SimplyBlu provider adapter; the provider remains behind the RemotePay boundary.
-4. RemotePay provider credentials are environment-only; hardcoded PayFast credentials were removed from `backend/core/config.py`.
-5. RemotePay payment-link persistence is still an in-memory foundation store. Persistent transaction/economic-event/settlement integration remains outstanding.
-6. Live/sandbox provider verification is still outstanding; no live-money readiness claim is made.
-7. The C6 repository still contains legacy SimplyBlu backend code; it is no longer the package-page merchant-facing path and should be removed/deprecated only after runtime verification confirms no other consumer depends on it.
-8. The repository contains generated `app/dist` content and `Thumbs.db`; cleanup is a separate repository hygiene task and must not break deployment.
+### 2026-08-25 — RemotePay/C6 payment boundary
 
-## Operating rule
+- **Fixed:** C6 package checkout now calls RemotePay rather than the legacy direct SimplyBlu path.
+- **Fixed:** C6 payment creation now carries brand/product/offer/customer/source attribution and an idempotency key.
+- **Fixed:** RemotePay now has a dedicated SimplyBlu provider adapter so the underlying processor remains behind RemotePay.
+- **Fixed:** Hardcoded payment credentials were removed from RemotePay source configuration; provider credentials are environment-only.
+- **Added:** RemotePay payment-link tests use a mocked provider and verify idempotency.
+- **Added:** SimplyBlu adapter test verifies provider checkout URL normalization.
+- **Evidence status:** Code-level changes committed to GitHub; real provider sandbox verification remains OPEN.
 
-**Do not implement speculative integrations.** Every change must be tied to a tracker item, tested where possible, and recorded in Git history. No live-money claim is made until the RemotePay production verification gate is satisfied.
+## CURRENT BLOCKERS / FINDINGS
+
+1. **Critical next action:** use the existing working SimplyBlu payment-link/email/SMS API contract rather than inventing provider semantics. The exact provider API contract must be verified from the existing RemotePay implementation/configuration before live integration is claimed.
+2. RemotePay payment-link persistence is currently an in-memory foundation store. Persistent transaction/economic-event/settlement integration remains outstanding.
+3. Live/sandbox provider verification is still outstanding; no live-money readiness claim is made.
+4. The C6 repository still contains legacy SimplyBlu backend code; it is no longer the package-page merchant-facing path and should be removed/deprecated only after runtime verification confirms no other consumer depends on it.
+5. The repository contains generated `app/dist` content and `Thumbs.db`; cleanup is a separate repository hygiene task and must not break deployment.
+
+## OPERATING RULE
+
+**Approved sprint destination = execution authority.** If a discovered defect is clearly within scope, bounded, low-risk and objectively correct, fix it, test it, log it and continue. Stop only for material business, legal, destructive, credential, production-money or architecture decisions.
+
+**No live-money claim is made until the RemotePay production verification gate is satisfied.**
