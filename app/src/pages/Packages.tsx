@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { Footer } from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
-import { SimplyBluPaymentButton } from '@/components/SimplyBluPayment';
-import { CheckCircle2, X, Zap, TrendingUp, Rocket, Building2, MessageSquare, ChevronRight } from 'lucide-react';
+import { RemotePay } from '@/components/RemotePay';
+import { CheckCircle2, Zap, TrendingUp, Rocket, Building2, MessageSquare, ChevronRight } from 'lucide-react';
 
 const packages = [
   {
@@ -123,13 +123,13 @@ export function PackagesPage() {
                       Get My Free Audit
                     </Link>
                   ) : isAuthenticated ? (
-                    <SimplyBluPaymentButton
+                    <RemotePay
                       amount={pkg.price}
                       description={`${pkg.name} - Monthly Subscription`}
-                      packageId={pkg.id}
-                      buttonText={`Start ${pkg.name} — R${pkg.price}/month`}
-                      variant="primary"
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white border-0"
+                      merchantId={undefined}
+                      brandId="c6-group"
+                      productId={`c6-${pkg.id}`}
+                      offerId={pkg.id}
                     />
                   ) : (
                     <Link to="/register" className="block text-center py-3 rounded-lg font-semibold text-sm bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
