@@ -19,12 +19,12 @@
 
 ## Phase 1 — Commercial positioning lock
 
-- [ ] Define one clear C6 Group proposition above the product catalogue.
-- [ ] Present C6 as the parent ecosystem/brand without implying unincorporated subsidiaries are separate legal entities.
-- [ ] Position Ubernie as the business intelligence / operating product.
-- [ ] Position RemotePay Fintech Services as the current payment entity/rail.
-- [ ] Add a clear ecosystem relationship section: C6 → Ubernie / RemotePay / other verticals.
-- [ ] Remove conflicting or outdated provider language from customer-facing C6 copy.
+- [x] Define one clear C6 Group proposition above the product catalogue.
+- [x] Present C6 as the parent ecosystem/brand without implying unincorporated subsidiaries are separate legal entities.
+- [x] Position Ubernie as the business intelligence / operating product.
+- [x] Position RemotePay Fintech Services as the current payment entity/rail.
+- [x] Add a clear ecosystem relationship section: C6 → Ubernie / RemotePay / other verticals.
+- [x] Remove conflicting or outdated provider language from customer-facing C6 copy.
 - [ ] Ensure every primary CTA maps to a measurable commercial next step.
 
 ## Phase 2 — Offer architecture & pricing
@@ -51,10 +51,10 @@
 
 ## Phase 4 — RemotePay commercial integration
 
-- [ ] Make RemotePay the C6-facing payment boundary.
+- [x] Make RemotePay the C6-facing payment boundary.
 - [ ] Keep current processor behind RemotePay/provider adapter architecture.
-- [ ] Pass brand, product, offer and customer attribution into payment creation.
-- [ ] Replace direct SimplyBlu naming in the merchant-facing architecture where RemotePay is the commercial layer.
+- [x] Pass brand, product, offer and customer attribution into payment creation.
+- [x] Replace direct SimplyBlu naming in the merchant-facing architecture where RemotePay is the commercial layer.
 - [ ] Preserve SimplyBlu as the current underlying processor only where technically accurate.
 - [ ] Verify webhook → transaction lifecycle → settlement/reconciliation path.
 - [ ] Ensure refunds and adjustments retain original transaction attribution.
@@ -105,12 +105,12 @@
 
 ## Current blockers / findings
 
-1. The frontend currently presents C6 as an AI-powered business intelligence ecosystem and already has audit, packages, dashboard and AI-tools routes.
-2. Homepage currently shows package prices of Free, R499/month and R1,499/month.
-3. The packages page uses `SimplyBluPaymentButton` directly for paid packages.
-4. The payment component calls `/api/v1/payments/simplyblu/initiate`, which means the current website payment boundary is processor-specific rather than RemotePay-branded.
-5. The homepage trust logos still include `PayFast`, which conflicts with the current RemotePay-first commercial direction.
-6. The repository contains generated `app/dist` content and a `Thumbs.db`; cleanup is a separate repository hygiene task and must not break deployment.
+1. C6 paid package checkout now calls the RemotePay payment-link API directly rather than the legacy SimplyBlu endpoint.
+2. C6 payment creation now carries `brand_id`, `product_id`, `offer_id`, customer reference support, and source-system metadata for attribution.
+3. RemotePay's current payment-link implementation is still a foundation API: it creates an internal payment-link record and currently returns a relative `/pay/{payment_id}` URL. It does not yet execute the underlying processor checkout.
+4. The next RemotePay integration step is therefore to connect the payment-link boundary to the configured underlying processor adapter before C6 live checkout is declared operational.
+5. The C6 repository still contains legacy SimplyBlu backend code; it is no longer the package-page merchant-facing path and should be removed/deprecated only after runtime verification confirms no other consumer depends on it.
+6. The repository contains generated `app/dist` content and `Thumbs.db`; cleanup is a separate repository hygiene task and must not break deployment.
 
 ## Operating rule
 
