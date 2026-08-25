@@ -8,11 +8,12 @@ interface RemotePayProps {
   description: string;
   merchantId?: string;
   brandId?: string;
+  productId?: string;
+  offerId?: string;
+  customerReference?: string;
   onSuccess?: (paymentUrl: string) => void;
   onCancel?: () => void;
 }
-
-type PaymentMethod = 'remote-pay';
 
 interface PaymentLinkResponse {
   payment_id: string;
@@ -29,7 +30,17 @@ const REMOTEPAY_API_URL = import.meta.env.VITE_REMOTEPAY_API_URL;
 const REMOTEPAY_MERCHANT_ID = import.meta.env.VITE_REMOTEPAY_MERCHANT_ID;
 const REMOTEPAY_BRAND_ID = import.meta.env.VITE_REMOTEPAY_BRAND_ID || 'c6-group';
 
-export function RemotePay({ amount, description, merchantId, brandId, onSuccess, onCancel }: RemotePayProps) {
+export function RemotePay({
+  amount,
+  description,
+  merchantId,
+  brandId,
+  productId,
+  offerId,
+  customerReference,
+  onSuccess,
+  onCancel,
+}: RemotePayProps) {
   const [step, setStep] = useState<'method' | 'processing' | 'success'>('method');
   const [reference, setReference] = useState('');
   const [paymentUrl, setPaymentUrl] = useState('');
@@ -50,7 +61,7 @@ export function RemotePay({ amount, description, merchantId, brandId, onSuccess,
     setError('');
     setStep('processing');
 
-    const idempotencyKey = `c6-${crypto.randomUUID()}`;
+    const idempotencyKey = `c6-${productId || 'product'}-${offerId || 'offer'}-${crypto.randomUUID()}`;
 
     try {
       const response = await fetch(`${REMOTEPAY_API_URL.replace(/\/$/, '')}/payment-links`, {
@@ -60,11 +71,18 @@ export function RemotePay({ amount, description, merchantId, brandId, onSuccess,
           merchant_id: resolvedMerchantId,
           brand_id: brandId || REMOTEPAY_BRAND_ID,
           source_system: 'c6-group-website',
+          customer_reference: customerReference,
+          product_id: productId,
+          offer_id: offerId,
           description,
           amount_minor: Math.round(amount * 100),
           currency: 'ZAR',
           idempotency_key: idempotencyKey,
-          metadata: { product: 'c6-group-website' },
+          metadata: {
+            product: productId || 'c6-group-product',
+            offer: offerId || 'c6-group-offer',
+            source: 'c6-group-website',
+          },
         }),
       });
 
