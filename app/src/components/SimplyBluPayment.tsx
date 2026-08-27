@@ -6,8 +6,6 @@ interface SimplyBluPaymentProps {
   amount: number;
   description: string;
   packageId: string;
-  onSuccess?: () => void;
-  onCancel?: () => void;
   buttonText?: string;
   variant?: 'primary' | 'secondary' | 'outline';
   className?: string;
@@ -32,8 +30,6 @@ export function SimplyBluPaymentButton({
   amount,
   description,
   packageId,
-  onSuccess,
-  onCancel,
   buttonText = 'Pay Securely',
   variant = 'primary',
   className = '',
@@ -156,7 +152,6 @@ export function SimplyBluPaymentModal({
             amount={amount}
             description={description}
             packageId={packageId}
-            onSuccess={onClose}
             buttonText="Pay with Card"
             variant="primary"
           />

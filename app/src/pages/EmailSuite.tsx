@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { Footer } from '@/components/Footer';
-import { Button } from '@/components/ui/button';
 import {
-  Mail, Shield, BarChart3, Zap, Globe, CheckCircle2, ArrowRight, Send, Lock, Server
+  Mail, Shield, BarChart3, Zap, Globe, CheckCircle2, ArrowRight, Send, Server
 } from 'lucide-react';
 
 const features = [

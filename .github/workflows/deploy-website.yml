@@ -1,0 +1,92 @@
+name: C6 Website Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c6-website-production
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy C6 Website
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify production artifact
+        shell: bash
+        run: |
+          set -e
+
+          test -f dist/index.html
+          test -d dist/assets
+
+          if grep -q '/src/main.tsx' dist/index.html; then
+            echo "❌ Source entry detected"
+            exit 1
+          fi
+
+          grep -Eq 'assets/.*\.(js|mjs)' dist/index.html
+          grep -Eq 'assets/.*\.css' dist/index.html
+
+          echo "✅ Production artifact validated"
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: app
+          command: deploy
+
+      - name: Smoke test
+        shell: bash
+        env:
+          DEPLOYMENT_URL: https://c6-group-final-website.hlonifela.workers.dev
+        run: |
+          set -e
+
+          HTTP_STATUS="$(curl -L -s -o /tmp/c6-index.html -w '%{http_code}' "$DEPLOYMENT_URL")"
+
+          echo "HTTP status: $HTTP_STATUS"
+
+          test "$HTTP_STATUS" = "200"
+          grep -q '<div id="root"></div>' /tmp/c6-index.html
+
+          if grep -q '/src/main.tsx' /tmp/c6-index.html; then
+            echo "❌ Deployment serves source entry"
+            exit 1
+          fi
+
+          grep -Eq 'assets/.*\.(js|mjs)' /tmp/c6-index.html
+
+          echo "✅ Cloudflare smoke test passed"
