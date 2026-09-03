@@ -33,9 +33,29 @@ interface LLMResponse {
 }
 
 // Initialize LLM clients
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openRouterClient = process.env.OPENROUTER_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL:
+        process.env.OPENROUTER_BASE_URL ||
+        'https://openrouter.ai/api/v1',
+    })
+  : null;
+
+const nvidiaClient = process.env.NVIDIA_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.NVIDIA_API_KEY,
+      baseURL:
+        process.env.NVIDIA_BASE_URL ||
+        'https://integrate.api.nvidia.com/v1',
+    })
+  : null;
+
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  : null;
 
 // Anthropic client setup
 const anthropicClient = axios.create({
@@ -282,7 +302,7 @@ export class AIService {
     return {
       packageType,
       limits,
-      totalCost: usage._sum.cost || 0,
+      totalCost: usage._sum.cost == null ? 0 : Number(usage._sum.cost),
       totalTokens: usage._sum.tokensUsed || 0
     };
   }
@@ -331,6 +351,10 @@ export class AIService {
       switch (provider) {
         case LLMProvider.OPENAI:
           return await this.callOpenAI(prompt, model);
+        case LLMProvider.OPENROUTER:
+          return await this.callOpenRouter(prompt, model);
+        case LLMProvider.NVIDIA:
+          return await this.callNvidia(prompt);
         case LLMProvider.ANTHROPIC:
           return await this.callAnthropic(prompt, model);
         case LLMProvider.GOOGLE:
@@ -349,31 +373,144 @@ export class AIService {
   /**
    * Call OpenAI API
    */
-  private async callOpenAI(prompt: string, model: string): Promise<LLMResponse> {
-    const response = await openai.chat.completions.create({
+  private async callOpenAI(
+    prompt: string,
+    model: string
+  ): Promise<LLMResponse> {
+    if (!openai) {
+      throw new Error('OpenAI provider is not configured.');
+    }
+
+    return this.callOpenAICompatible(
+      openai,
+      prompt,
       model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 4000,
-    });
-    
-    const content = response.choices[0]?.message?.content || '';
-    const inputTokens = response.usage?.prompt_tokens || 0;
-    const outputTokens = response.usage?.completion_tokens || 0;
-    const totalTokens = inputTokens + outputTokens;
-    
-    const cost = this.calculateCost(model, inputTokens, outputTokens);
-    
+      LLMProvider.OPENAI
+    );
+  }
+
+  /**
+   * Call OpenRouter.
+   */
+  private async callOpenRouter(
+    prompt: string,
+    model: string
+  ): Promise<LLMResponse> {
+    if (!openRouterClient) {
+      if (nvidiaClient) {
+        logger.warn(
+          'OpenRouter unavailable; falling back to NVIDIA.'
+        );
+        return this.callNvidia(prompt);
+      }
+
+      throw new Error(
+        'Free AI provider is not configured. Set OPENROUTER_API_KEY or NVIDIA_API_KEY.'
+      );
+    }
+
+    try {
+      return await this.callOpenAICompatible(
+        openRouterClient,
+        prompt,
+        model,
+        LLMProvider.OPENROUTER
+      );
+    } catch (error) {
+      if (nvidiaClient) {
+        logger.warn(
+          'OpenRouter request failed; falling back to NVIDIA.',
+          error
+        );
+        return this.callNvidia(prompt);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Call NVIDIA NIM.
+   */
+  private async callNvidia(
+    prompt: string
+  ): Promise<LLMResponse> {
+    if (!nvidiaClient) {
+      throw new Error(
+        'NVIDIA provider is not configured. Set NVIDIA_API_KEY.'
+      );
+    }
+
+    const model =
+      process.env.NVIDIA_MODEL ||
+      'meta/llama-3.3-70b-instruct';
+
+    return this.callOpenAICompatible(
+      nvidiaClient,
+      prompt,
+      model,
+      LLMProvider.NVIDIA
+    );
+  }
+
+  /**
+   * Shared OpenAI-compatible implementation.
+   */
+  private async callOpenAICompatible(
+    client: OpenAI,
+    prompt: string,
+    model: string,
+    provider: LLMProvider
+  ): Promise<LLMResponse> {
+    const response =
+      await client.chat.completions.create({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000,
+      });
+
+    const content =
+      response.choices[0]?.message?.content || '';
+
+    const inputTokens =
+      response.usage?.prompt_tokens || 0;
+
+    const outputTokens =
+      response.usage?.completion_tokens || 0;
+
+    const totalTokens =
+      inputTokens + outputTokens;
+
+    const cost =
+      provider === LLMProvider.OPENROUTER ||
+      provider === LLMProvider.NVIDIA
+        ? 0
+        : this.calculateCost(
+            model,
+            inputTokens,
+            outputTokens
+          );
+
     return {
       content,
-      tokensUsed: { input: inputTokens, output: outputTokens, total: totalTokens },
+      tokensUsed: {
+        input: inputTokens,
+        output: outputTokens,
+        total: totalTokens
+      },
       cost,
       model,
-      provider: LLMProvider.OPENAI,
+      provider,
       duration: 0
     };
   }
-  
+
   /**
    * Call Anthropic Claude API
    */
@@ -468,12 +605,33 @@ export class AIService {
    * Determine LLM provider from model name
    */
   private getProviderFromModel(model: string): LLMProvider {
+    if (
+      model === 'openrouter/free' ||
+      model.startsWith('openrouter/')
+    ) {
+      return LLMProvider.OPENROUTER;
+    }
+
+    if (model.startsWith('nvidia/')) {
+      return LLMProvider.NVIDIA;
+    }
+
     if (model.startsWith('gpt-')) return LLMProvider.OPENAI;
     if (model.startsWith('claude-')) return LLMProvider.ANTHROPIC;
     if (model.startsWith('gemini-')) return LLMProvider.GOOGLE;
-    if (model.startsWith('llama-') || model.startsWith('mixtral-')) return LLMProvider.GROQ;
-    if (model.startsWith('mistral-')) return LLMProvider.MISTRAL;
-    return LLMProvider.OPENAI; // Default
+
+    if (
+      model.startsWith('llama-') ||
+      model.startsWith('mixtral-')
+    ) {
+      return LLMProvider.GROQ;
+    }
+
+    if (model.startsWith('mistral-')) {
+      return LLMProvider.MISTRAL;
+    }
+
+    return LLMProvider.OPENAI;
   }
   
   /**

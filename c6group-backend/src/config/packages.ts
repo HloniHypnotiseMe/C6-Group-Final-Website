@@ -1,3 +1,7 @@
+import {
+  getCommercialPackage,
+} from './commercialCatalog';
+
 import { PackageConfig, PackageType, AgentType, SupportLevel } from '../types';
 
 // ============================================
@@ -11,8 +15,8 @@ export const packageConfigs: Record<PackageType, PackageConfig> = {
   [PackageType.LEAD]: {
     id: PackageType.LEAD,
     name: 'Lead Package',
-    monthlyPrice: 0,
-    annualPrice: 0,
+    monthlyPrice: getCommercialPackage("LEAD").monthlyPriceZar,
+    annualPrice: getCommercialPackage("LEAD").annualPriceZar,
     aiLimits: {
       [AgentType.BUSINESS_AUDIT]: 1,
       [AgentType.SEO_ANALYZER]: 0,
@@ -39,8 +43,8 @@ export const packageConfigs: Record<PackageType, PackageConfig> = {
   [PackageType.DIAMOND]: {
     id: PackageType.DIAMOND,
     name: 'Diamond',
-    monthlyPrice: 4995,
-    annualPrice: 49950,
+    monthlyPrice: getCommercialPackage("DIAMOND").monthlyPriceZar,
+    annualPrice: getCommercialPackage("DIAMOND").annualPriceZar,
     aiLimits: {
       [AgentType.BUSINESS_AUDIT]: 5,
       [AgentType.SEO_ANALYZER]: 20,
@@ -69,8 +73,8 @@ export const packageConfigs: Record<PackageType, PackageConfig> = {
   [PackageType.GOLD]: {
     id: PackageType.GOLD,
     name: 'Gold',
-    monthlyPrice: 9995,
-    annualPrice: 99950,
+    monthlyPrice: getCommercialPackage("GOLD").monthlyPriceZar,
+    annualPrice: getCommercialPackage("GOLD").annualPriceZar,
     aiLimits: {
       [AgentType.BUSINESS_AUDIT]: 10,
       [AgentType.SEO_ANALYZER]: 100,
@@ -100,8 +104,8 @@ export const packageConfigs: Record<PackageType, PackageConfig> = {
   [PackageType.PLATINUM]: {
     id: PackageType.PLATINUM,
     name: 'Platinum',
-    monthlyPrice: 24995,
-    annualPrice: 249950,
+    monthlyPrice: getCommercialPackage("PLATINUM").monthlyPriceZar,
+    annualPrice: getCommercialPackage("PLATINUM").annualPriceZar,
     aiLimits: {
       [AgentType.BUSINESS_AUDIT]: 50,
       [AgentType.SEO_ANALYZER]: 200,
@@ -131,8 +135,8 @@ export const packageConfigs: Record<PackageType, PackageConfig> = {
   [PackageType.ENTERPRISE]: {
     id: PackageType.ENTERPRISE,
     name: 'Enterprise',
-    monthlyPrice: 0,
-    annualPrice: 0,
+    monthlyPrice: getCommercialPackage("ENTERPRISE").monthlyPriceZar,
+    annualPrice: getCommercialPackage("ENTERPRISE").annualPriceZar,
     aiLimits: {
       [AgentType.BUSINESS_AUDIT]: -1,
       [AgentType.SEO_ANALYZER]: -1,
@@ -201,7 +205,7 @@ export const LLM_COSTS: Record<string, { input: number; output: number }> = {
 };
 
 export const AGENT_DEFAULT_MODELS: Record<AgentType, string> = {
-  [AgentType.BUSINESS_AUDIT]: 'gpt-4o',
+  [AgentType.BUSINESS_AUDIT]: 'openrouter/free',
   [AgentType.SEO_ANALYZER]: 'gpt-4o-mini',
   [AgentType.CONTENT_GENERATOR]: 'claude-3-5-sonnet',
   [AgentType.CHATBOT]: 'gpt-4o-mini',
