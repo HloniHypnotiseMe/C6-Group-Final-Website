@@ -3,6 +3,7 @@ services:
     name: c6group-backend
     env: node
     plan: free
+    region: singapore
     rootDir: c6group-backend
     buildCommand: npm ci && npx prisma generate && npm run build
     startCommand: node dist/server.js
@@ -15,8 +16,7 @@ services:
           name: c6group-db
           property: connectionString
           key: DATABASE_URL
-
 databases:
     - name: c6group-db
     plan: free
-    ipAllowList: []
+    region: singapore
