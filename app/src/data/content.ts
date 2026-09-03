@@ -1,3 +1,4 @@
+import { getCommercialPrice } from '../config/commercial';
 // C6GROUP AI Business Ecosystem - Static Content Data
 
 import type { Package, Testimonial, Customer, ActivityItem, ChannelPerformance } from '@/types';
@@ -21,8 +22,8 @@ export const packages: Package[] = [
   {
     id: 'diamond',
     name: 'Diamond',
-    price: 299.99,
-    annualPrice: 239.99,
+    price: getCommercialPrice("DIAMOND", "MONTHLY"),
+    annualPrice: getCommercialPrice("DIAMOND", "ANNUAL"),
     description: 'Perfect for solopreneurs & small teams',
     features: [
       'Reputation Tool',
@@ -36,8 +37,8 @@ export const packages: Package[] = [
   {
     id: 'gold',
     name: 'Gold',
-    price: 699,
-    annualPrice: 559,
+    price: getCommercialPrice("GOLD", "MONTHLY"),
+    annualPrice: getCommercialPrice("GOLD", "ANNUAL"),
     description: 'Ideal for growing businesses',
     features: [
       'Everything in Diamond',
@@ -53,8 +54,8 @@ export const packages: Package[] = [
   {
     id: 'platinum',
     name: 'Platinum',
-    price: 1499,
-    annualPrice: 1199,
+    price: getCommercialPrice("PLATINUM", "MONTHLY"),
+    annualPrice: getCommercialPrice("PLATINUM", "ANNUAL"),
     description: 'For established businesses ready to scale',
     features: [
       'Everything in Gold',
@@ -69,8 +70,8 @@ export const packages: Package[] = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 0,
-    annualPrice: 0,
+    price: null,
+    annualPrice: null,
     description: 'For large businesses & agencies',
     features: [
       'SuperAI Agents',

@@ -1,3 +1,4 @@
+import { getCommercialPrice } from '../../config/commercial';
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 // @ts-ignore - animejs v4 uses named exports
@@ -15,63 +16,57 @@ import { cn, formatCurrency } from '@/lib/utils';
  */
 const packages = [
   {
-    id: 'audit',
-    name: 'Business Audit',
-    price: 0,
-    description: 'Find the biggest opportunities hiding inside your business.',
+    id: 'diamond',
+    name: 'Diamond',
+    price: getCommercialPrice("DIAMOND", "MONTHLY"),
+    description: 'Foundational C6 business growth and automation package.',
     features: [
-      'AI business health assessment',
-      'Digital visibility review',
-      'Customer acquisition review',
-      'Revenue opportunity analysis',
-      'Personalised growth recommendations'
-    ],
-    ctaText: 'Get My Free Audit'
-  },
-  {
-    id: 'visibility',
-    name: 'Visibility Machine',
-    price: 499,
-    description: 'Get found, look credible, and turn local attention into enquiries.',
-    features: [
-      'Business listing & profile optimisation',
-      'AI-assisted content creation',
-      'Search & visibility support',
-      'Reputation and review support',
-      'Growth reporting'
+      'Business visibility & reputation tools',
+      'AI Chatbot trained on your business',
+      'Up to 2 enabled AI tools',
+      'Basic analytics',
+      'Email support',
+      '500 chatbot messages/month',
+      '50 content generations/month',
+      '20 SEO analyses/month'
     ],
     highlighted: true,
-    ctaText: 'Build My Visibility'
+    ctaText: 'Start Diamond Package'
   },
   {
-    id: 'growth',
-    name: 'Customer Growth Machine',
-    price: 1499,
-    description: 'Turn attention into leads with a connected AI growth workforce.',
+    id: 'gold',
+    name: 'Gold',
+    price: getCommercialPrice("GOLD", "MONTHLY"),
+    description: 'Expanded growth, automation and intelligence package.',
     features: [
-      'Everything in Visibility Machine',
-      'Lead generation workflows',
-      'Email marketing automation',
-      'Social content & campaign support',
-      'AI customer engagement',
-      'Advanced growth analytics'
+      'Everything in Diamond',
+      'Traffic & growth analyst',
+      'Up to 3 enabled AI tools',
+      'Advanced analytics',
+      'Priority support',
+      '1-on-1 onboarding',
+      '2000 chatbot messages/month',
+      '200 content generations/month',
+      '100 SEO analyses/month'
     ],
-    ctaText: 'Grow My Customer Base'
+    ctaText: 'Start Gold Package'
   },
   {
-    id: 'revenue',
-    name: 'Revenue Machine',
-    price: 3499,
-    description: 'A deeper AI operating layer for businesses ready to scale revenue.',
+    id: 'platinum',
+    name: 'Platinum',
+    price: getCommercialPrice("PLATINUM", "MONTHLY"),
+    description: 'Advanced C6 intelligence, growth and implementation package.',
     features: [
-      'Everything in Customer Growth Machine',
-      'AI sales & follow-up workflows',
-      'Business intelligence reporting',
-      'Advanced customer segmentation',
-      'Custom automation workflows',
-      'Priority support'
+      'Everything in Gold',
+      '1 AI Staff Member',
+      'Business Intelligence Dashboard',
+      'Dedicated account manager',
+      'Priority phone support',
+      'Custom integrations',
+      'High-volume AI allowance with fair-use controls',
+      'White-label options'
     ],
-    ctaText: 'Scale My Revenue'
+    ctaText: 'Start Platinum Package'
   }
 ];
 
@@ -142,10 +137,18 @@ export function PackageShowcase() {
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-poppins font-bold mb-2">{pkg.name}</h3>
                 <div className="text-4xl font-bold text-electric-cyan mb-2">
-                  {pkg.price === 0 ? 'Free' : formatCurrency(pkg.price)}
+                  {pkg.price === null
+                    ? 'Custom pricing'
+                    : pkg.price === 0
+                      ? 'Free'
+                      : formatCurrency(pkg.price)}
                 </div>
                 <div className="text-sm text-soft-silver">
-                  {pkg.price === 0 ? 'No card required' : 'per month'}
+                  {pkg.price === null
+                    ? 'Contact sales'
+                    : pkg.price === 0
+                      ? 'No card required'
+                      : 'per month'}
                 </div>
                 <div className="text-xs text-soft-silver mt-2">{pkg.description}</div>
               </div>
