@@ -1,0 +1,22 @@
+services:
+    - type: web
+    name: c6group-backend
+    env: node
+    plan: free
+    rootDir: c6group-backend
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: node dist/server.js
+    envVars:
+            - key: NODE_ENV
+        value: production
+            - key: PORT
+        value: 10000
+            - fromDatabase:
+          name: c6group-db
+          property: connectionString
+          key: DATABASE_URL
+
+databases:
+    - name: c6group-db
+    plan: free
+    ipAllowList: []
