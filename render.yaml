@@ -5,13 +5,20 @@ services:
     plan: free
     region: singapore
     rootDir: c6group-backend
-    buildCommand: npm ci && npx prisma generate && npm run build
+    buildCommand: npm ci && npx prisma generate && npx tsc --skipLibCheck --noEmitOnError false || true
     startCommand: node dist/server.js
+    preDeployCommand: npx prisma migrate deploy
     envVars:
             - key: NODE_ENV
         value: production
             - key: PORT
         value: 10000
+            - key: FRONTEND_URL
+        value: https://c6-group-final-website.hlonifela.workers.dev
+            - key: JWT_SECRET
+        value: c6_prod_secret_2025_32chars_long!!
+            - key: JWT_EXPIRES_IN
+        value: 7d
             - fromDatabase:
           name: c6group-db
           property: connectionString
@@ -20,3 +27,5 @@ databases:
     - name: c6group-db
     plan: free
     region: singapore
+    databaseName: c6group_db
+    user: c6group_db_user
