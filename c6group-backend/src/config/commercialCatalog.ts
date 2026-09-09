@@ -1,16 +1,24 @@
-export const COMMERCIAL_PRICING = {
-  LEAD: { monthlyPriceZar: 0, annualPriceZar: 0 },
-  DIAMOND: { monthlyPriceZar: 4995, annualPriceZar: 49950 },
-  GOLD: { monthlyPriceZar: 9995, annualPriceZar: 99950 },
-  PLATINUM: { monthlyPriceZar: 24995, annualPriceZar: 249950 },
-  ENTERPRISE: { monthlyPriceZar: 0, annualPriceZar: 0 },
-} as const;
+import {
+  C6_COMMERCIAL_CATALOG,
+  getCommercialPackage as getSharedCommercialPackage,
+  resolveCommercialSku,
+  type CommercialSku,
+} from '../../../shared/commercialContract';
 
-export type CommercialPackageId = keyof typeof COMMERCIAL_PRICING;
+export const COMMERCIAL_PRICING = Object.fromEntries(
+  C6_COMMERCIAL_CATALOG.map(pkg => [pkg.sku, {
+    monthlyPriceZar: pkg.monthlyPriceZar,
+    annualPriceZar: pkg.annualPriceZar,
+  }]),
+) as Record<CommercialSku, {
+  monthlyPriceZar: number | null;
+  annualPriceZar: number | null;
+}>;
+
+export type CommercialPackageId = CommercialSku;
 
 export function getCommercialPackage(id: string) {
-  const key = id.toUpperCase() as CommercialPackageId;
-  return COMMERCIAL_PRICING[key] || COMMERCIAL_PRICING.LEAD;
+  return getSharedCommercialPackage(resolveCommercialSku(id));
 }
 
 export const commercialCatalog = COMMERCIAL_PRICING;

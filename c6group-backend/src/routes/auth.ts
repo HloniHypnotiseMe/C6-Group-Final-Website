@@ -5,8 +5,25 @@ import { createError } from '../middleware/errorHandler';
 import { prisma } from '../utils/prisma';
 import { logger } from '../utils/logger';
 import { z } from 'zod';
+import { PackageType } from '../types';
 
 const router = Router();
+
+const toPackageType = (value: string | null | undefined): PackageType => {
+  switch (value) {
+    case PackageType.DIAMOND:
+      return PackageType.DIAMOND;
+    case PackageType.GOLD:
+      return PackageType.GOLD;
+    case PackageType.PLATINUM:
+      return PackageType.PLATINUM;
+    case PackageType.ENTERPRISE:
+      return PackageType.ENTERPRISE;
+    case PackageType.LEAD:
+    default:
+      return PackageType.LEAD;
+  }
+};
 
 // Validation schemas
 const registerSchema = z.object({
@@ -164,7 +181,7 @@ router.post('/login', async (req, res, next) => {
       userId: user.id,
       email: user.email,
       role: user.role,
-      packageType: packageType as any,
+      packageType: toPackageType(packageType),
     });
     
     const refreshToken = generateRefreshToken(user.id);
@@ -287,7 +304,7 @@ router.post('/refresh', async (req, res, next) => {
       userId: user.id,
       email: user.email,
       role: user.role,
-      packageType: subscription?.packageId as any || 'lead',
+      packageType: toPackageType(subscription?.packageId),
     });
     
     const newRefreshToken = generateRefreshToken(user.id);

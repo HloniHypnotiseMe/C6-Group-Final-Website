@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Home } from '@/pages/Home';
 import { Audit } from '@/pages/Audit';
-import { PackagesPage } from '@/pages/Packages';
+ import { PackagesPage } from '@/pages/Packages';
 import { Dashboard } from '@/pages/Dashboard';
 import { AIToolsMarketplace } from '@/pages/AIToolsMarketplace';
 import { Login } from '@/pages/Login';

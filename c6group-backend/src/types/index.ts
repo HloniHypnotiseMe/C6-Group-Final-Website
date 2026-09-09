@@ -20,11 +20,13 @@ export interface User {
   status: UserStatus;
 }
 
-export enum UserRole {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
-  SUPPORT = 'SUPPORT'
-}
+export const UserRole = {
+  USER: 'USER',
+  ADMIN: 'ADMIN',
+  SUPPORT: 'SUPPORT'
+} as const;
+
+export type UserRole = typeof UserRole[keyof typeof UserRole];
 
 export enum UserStatus {
   ACTIVE = 'ACTIVE',
@@ -49,13 +51,15 @@ export interface Subscription {
   updatedAt: Date;
 }
 
-export enum PackageType {
-  LEAD = 'lead',
-  DIAMOND = 'diamond',
-  GOLD = 'gold',
-  PLATINUM = 'platinum',
-  ENTERPRISE = 'enterprise'
-}
+export const PackageType = {
+  LEAD: 'lead',
+  DIAMOND: 'diamond',
+  GOLD: 'gold',
+  PLATINUM: 'platinum',
+  ENTERPRISE: 'enterprise'
+} as const;
+
+export type PackageType = typeof PackageType[keyof typeof PackageType];
 
 export enum SubscriptionStatus {
   ACTIVE = 'ACTIVE',
@@ -100,10 +104,10 @@ export enum AgentType {
 export interface PackageConfig {
   id: PackageType;
   name: string;
-  monthlyPrice: number;
-  annualPrice: number;
+  monthlyPrice: number | null;
+  annualPrice: number | null;
   aiLimits: {
-    [key in AgentType]?: number; // monthly limit per agent, -1 for unlimited
+    [key in AgentType]: number; // monthly limit per agent, -1 for unlimited
   };
   features: string[];
   maxUsers?: number;
@@ -175,6 +179,8 @@ export interface LLMConfig {
 
 export enum LLMProvider {
   OPENAI = 'openai',
+  OPENROUTER = 'openrouter',
+  NVIDIA = 'nvidia',
   ANTHROPIC = 'anthropic',
   GOOGLE = 'google',
   COHERE = 'cohere',

@@ -256,7 +256,7 @@ router.get('/templates', authenticate, async (req, res, next) => {
       {
         id: 'packages',
         name: 'Package Information',
-        content: 'C6GROUP Packages:\nLead (FREE)\nDiamond (R299/mo)\nGold (R699/mo)\nPlatinum (R1499/mo)\nVisit https://c6group.co.za/packages for details.',
+        content: 'C6GROUP Packages:\nLead (FREE)\nDiamond (R4,995/mo)\nGold (R9,995/mo)\nPlatinum (R24,995/mo)\nEnterprise (Custom Pricing)\nVisit https://c6group.co.za/packages for details.',
         category: 'informational',
       },
       {
@@ -282,8 +282,8 @@ function getAutoResponse(message: string): string | null {
   const lowerMsg = message.toLowerCase();
   
   const responses: Record<string, string> = {
-    'pricing': 'Our packages start from FREE!\n\nLead Package: FREE (1 AI Audit)\nDiamond: R299/month\nGold: R699/month\nPlatinum: R1499/month\n\nVisit https://c6group.co.za/packages',
-    'package': 'Our packages start from FREE!\n\nLead Package: FREE (1 AI Audit)\nDiamond: R299/month\nGold: R699/month\nPlatinum: R1499/month\n\nVisit https://c6group.co.za/packages',
+    'pricing': 'Our packages start from FREE!\n\nLead Package: FREE (1 AI Audit)\nDiamond: R4,995/month\nGold: R9,995/month\nPlatinum: R24,995/month\n\nVisit https://c6group.co.za/packages',
+    'package': 'Our packages start from FREE!\n\nLead Package: FREE (1 AI Audit)\nDiamond: R4,995/month\nGold: R9,995/month\nPlatinum: R24,995/month\n\nVisit https://c6group.co.za/packages',
     'audit': 'Get your FREE AI Business Audit! It takes just 3 minutes and you\'ll get a comprehensive report with revenue insights and AI recommendations.\n\nVisit https://c6group.co.za/audit',
     'help': 'I can help you with:\n1. Information about our packages\n2. Free AI Business Audit\n3. AI Tools Marketplace\n4. Support inquiries\n\nWhat would you like to know?',
     'hello': 'Hello! Welcome to C6GROUP - your AI-powered business growth partner. How can I help you today?',

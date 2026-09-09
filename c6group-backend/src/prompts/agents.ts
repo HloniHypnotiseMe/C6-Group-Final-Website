@@ -182,7 +182,7 @@ CRITICAL INSTRUCTIONS:
         recommendedPackage: "gold",
         aiToolsRecommended: ["AI Chatbot", "Email Assistant", "SEO Analyzer"],
         estimatedROI: {
-          investment: 699,
+          investment: 9995,
           projectedReturn: 3750,
           paybackPeriod: "2 weeks"
         }

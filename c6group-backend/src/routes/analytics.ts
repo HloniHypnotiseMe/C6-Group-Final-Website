@@ -290,7 +290,7 @@ router.get('/admin', authenticate, authorize(UserRole.ADMIN), async (req, res, n
           byPackage: usersByPackage,
         },
         ai: {
-          totalCalls,
+          totalCalls: totalAiCalls,
           totalCost: totalAiCost._sum.cost || 0,
         },
         period: {
