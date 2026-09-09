@@ -82,7 +82,7 @@ jobs:
           test "$HTTP_STATUS" = "200"
           grep -q '<div id="root"></div>' /tmp/c6-index.html
 
-          if grep -q '/src/main.tsx' /tmp/c6-index.html; then
+          if grep -Eq '<script[^>]*src="/src/main.tsx"' /tmp/c6-index.html; then
             echo "❌ Deployment serves source entry"
             exit 1
           fi
