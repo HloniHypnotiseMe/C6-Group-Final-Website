@@ -2,7 +2,9 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Home } from '@/pages/Home';
 import { Audit } from '@/pages/Audit';
- import { PackagesPage } from '@/pages/Packages';
+import { PackagesPage } from '@/pages/Packages';
+import { PaymentCheckout } from '@/pages/PaymentCheckout';
+import { PaymentSuccess } from '@/pages/PaymentSuccess';
 import { Dashboard } from '@/pages/Dashboard';
 import { AIToolsMarketplace } from '@/pages/AIToolsMarketplace';
 import { Login } from '@/pages/Login';
@@ -25,6 +27,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/audit" element={<Audit />} />
           <Route path="/packages" element={<PackagesPage />} />
+          <Route path="/payment/checkout" element={<PaymentCheckout />} />
+          <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/ai-tools" element={<AIToolsMarketplace />} />
           <Route path="/login" element={<Login />} />
