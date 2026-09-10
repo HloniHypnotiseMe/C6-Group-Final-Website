@@ -5,8 +5,9 @@
 
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+// API Configuration. Production deployments should provide VITE_API_URL.
+// Relative fallback keeps the client same-origin when the edge layer proxies /api/v1.
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -14,17 +15,14 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 second timeout
+  timeout: 30000,
 });
 
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('c6group_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    // Add request ID for tracing
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     config.headers['X-Request-ID'] = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     return config;
   },
@@ -36,38 +34,24 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-    // Handle 401 Unauthorized - try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
         const refreshToken = localStorage.getItem('c6group_refresh_token');
         if (!refreshToken) {
-          // No refresh token, logout user
           localStorage.removeItem('c6group_token');
           localStorage.removeItem('c6group_refresh_token');
           localStorage.removeItem('c6group_user');
           window.location.href = '/login';
           return Promise.reject(error);
         }
-
-        // Call refresh endpoint
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refreshToken,
-        });
-
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
         const { token, refreshToken: newRefreshToken } = response.data.data;
-
-        // Store new tokens
         localStorage.setItem('c6group_token', token);
         localStorage.setItem('c6group_refresh_token', newRefreshToken);
-
-        // Retry original request
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, logout
         localStorage.removeItem('c6group_token');
         localStorage.removeItem('c6group_refresh_token');
         localStorage.removeItem('c6group_user');
@@ -75,309 +59,77 @@ apiClient.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-
-    // Handle 403 Forbidden
-    if (error.response?.status === 403) {
-      console.error('Access forbidden:', error.response.data);
-    }
-
-    // Handle 429 Rate Limit
-    if (error.response?.status === 429) {
-      console.error('Rate limit exceeded:', error.response.data);
-    }
-
-    // Handle network errors
-    if (!error.response) {
-      console.error('Network error - API server may be unavailable');
-    }
-
+    if (error.response?.status === 403) console.error('Access forbidden:', error.response.data);
+    if (error.response?.status === 429) console.error('Rate limit exceeded:', error.response.data);
+    if (!error.response) console.error('Network error - API server may be unavailable');
     return Promise.reject(error);
   }
 );
 
-// ============================================
-// Auth API
-// ============================================
 export const authApi = {
-  register: async (data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    phone?: string;
-    companyName?: string;
-    industry?: string;
-  }) => {
-    const response = await apiClient.post('/auth/register', data);
-    return response.data;
-  },
-
-  login: async (data: { email: string; password: string }) => {
-    const response = await apiClient.post('/auth/login', data);
-    return response.data;
-  },
-
-  logout: async () => {
-    const response = await apiClient.post('/auth/logout');
-    return response.data;
-  },
-
-  me: async () => {
-    const response = await apiClient.get('/auth/me');
-    return response.data;
-  },
-
-  refresh: async (refreshToken: string) => {
-    const response = await apiClient.post('/auth/refresh', { refreshToken });
-    return response.data;
-  },
+  register: async (data: { email: string; password: string; firstName: string; lastName: string; phone?: string; companyName?: string; industry?: string }) => (await apiClient.post('/auth/register', data)).data,
+  login: async (data: { email: string; password: string }) => (await apiClient.post('/auth/login', data)).data,
+  logout: async () => (await apiClient.post('/auth/logout')).data,
+  me: async () => (await apiClient.get('/auth/me')).data,
+  refresh: async (refreshToken: string) => (await apiClient.post('/auth/refresh', { refreshToken })).data,
 };
 
-// ============================================
-// AI API
-// ============================================
 export const aiApi = {
-  executeAgent: async (data: {
-    agentType: string;
-    parameters: Record<string, unknown>;
-    context?: Record<string, unknown>;
-  }) => {
-    const response = await apiClient.post('/ai/execute', data);
-    return response.data;
-  },
-
-  runAudit: async (data: Record<string, unknown>) => {
-    const response = await apiClient.post('/ai/audit', data);
-    return response.data;
-  },
-
-  generateContent: async (data: {
-    contentType: string;
-    topic: string;
-    targetAudience: string;
-    [key: string]: unknown;
-  }) => {
-    const response = await apiClient.post('/ai/content', data);
-    return response.data;
-  },
-
-  analyzeSEO: async (data: {
-    websiteUrl: string;
-    businessType: string;
-    location?: string;
-    targetKeywords?: string[];
-    competitors?: string[];
-  }) => {
-    const response = await apiClient.post('/ai/seo', data);
-    return response.data;
-  },
-
-  generateEmail: async (data: {
-    emailType: string;
-    recipient: Record<string, unknown>;
-    purpose: string;
-    keyMessage: string;
-    offer?: Record<string, unknown>;
-    tone?: string;
-  }) => {
-    const response = await apiClient.post('/ai/email', data);
-    return response.data;
-  },
-
-  chat: async (data: {
-    businessContext: Record<string, unknown>;
-    conversationHistory: Array<{ role: string; content: string }>;
-    userMessage: string;
-    userInfo?: Record<string, unknown>;
-  }) => {
-    const response = await apiClient.post('/ai/chat', data);
-    return response.data;
-  },
-
-  getAgents: async () => {
-    const response = await apiClient.get('/ai/agents');
-    return response.data;
-  },
-
-  getAgentDetails: async (agentType: string) => {
-    const response = await apiClient.get(`/ai/agents/${agentType}`);
-    return response.data;
-  },
-
-  getUsage: async () => {
-    const response = await apiClient.get('/ai/usage');
-    return response.data;
-  },
+  executeAgent: async (data: { agentType: string; parameters: Record<string, unknown>; context?: Record<string, unknown> }) => (await apiClient.post('/ai/execute', data)).data,
+  runAudit: async (data: Record<string, unknown>) => (await apiClient.post('/ai/audit', data)).data,
+  generateContent: async (data: { contentType: string; topic: string; targetAudience: string; [key: string]: unknown }) => (await apiClient.post('/ai/content', data)).data,
+  analyzeSEO: async (data: { websiteUrl: string; businessType: string; location?: string; targetKeywords?: string[]; competitors?: string[] }) => (await apiClient.post('/ai/seo', data)).data,
+  generateEmail: async (data: { emailType: string; recipient: Record<string, unknown>; purpose: string; keyMessage: string; offer?: Record<string, unknown>; tone?: string }) => (await apiClient.post('/ai/email', data)).data,
+  chat: async (data: { businessContext: Record<string, unknown>; conversationHistory: Array<{ role: string; content: string }>; userMessage: string; userInfo?: Record<string, unknown> }) => (await apiClient.post('/ai/chat', data)).data,
+  getAgents: async () => (await apiClient.get('/ai/agents')).data,
+  getAgentDetails: async (agentType: string) => (await apiClient.get(`/ai/agents/${agentType}`)).data,
+  getUsage: async () => (await apiClient.get('/ai/usage')).data,
 };
 
-// ============================================
-// Subscription API
-// ============================================
 export const subscriptionApi = {
-  getCurrent: async () => {
-    const response = await apiClient.get('/subscriptions/current');
-    return response.data;
-  },
-
-  create: async (data: {
-    packageId: string;
-    billingCycle: string;
-    paymentMethod: string;
-  }) => {
-    const response = await apiClient.post('/subscriptions', data);
-    return response.data;
-  },
-
-  upgrade: async (data: { packageId: string; billingCycle: string }) => {
-    const response = await apiClient.post('/subscriptions/upgrade', data);
-    return response.data;
-  },
-
-  cancel: async () => {
-    const response = await apiClient.post('/subscriptions/cancel');
-    return response.data;
-  },
-
-  getPackages: async () => {
-    const response = await apiClient.get('/subscriptions/packages');
-    return response.data;
-  },
+  getCurrent: async () => (await apiClient.get('/subscriptions/current')).data,
+  create: async (data: { packageId: string; billingCycle: string; paymentMethod: string }) => (await apiClient.post('/subscriptions', data)).data,
+  upgrade: async (data: { packageId: string; billingCycle: string }) => (await apiClient.post('/subscriptions/upgrade', data)).data,
+  cancel: async () => (await apiClient.post('/subscriptions/cancel')).data,
+  getPackages: async () => (await apiClient.get('/subscriptions/packages')).data,
 };
 
-// ============================================
-// Payment API (RemotePay)
-// ============================================
 export const paymentApi = {
-  createPayment: async (data: {
-    amount: number;
-    currency?: string;
-    paymentMethod: string;
-    description: string;
-    metadata?: Record<string, unknown>;
-  }) => {
-    const response = await apiClient.post('/payments', data);
-    return response.data;
-  },
-
-  getPaymentStatus: async (paymentId: string) => {
-    const response = await apiClient.get(`/payments/${paymentId}/status`);
-    return response.data;
-  },
-
-  getPaymentMethods: async () => {
-    const response = await apiClient.get('/payments/methods');
-    return response.data;
-  },
-
-  getHistory: async () => {
-    const response = await apiClient.get('/payments/history');
-    return response.data;
-  },
+  createPayment: async (data: { amount: number; currency?: string; paymentMethod: string; description: string; metadata?: Record<string, unknown> }) => (await apiClient.post('/payments', data)).data,
+  getPaymentStatus: async (paymentId: string) => (await apiClient.get(`/payments/${paymentId}/status`)).data,
+  getPaymentMethods: async () => (await apiClient.get('/payments/methods')).data,
+  getHistory: async () => (await apiClient.get('/payments/history')).data,
 };
 
-// ============================================
-// User API
-// ============================================
 export const userApi = {
-  getProfile: async () => {
-    const response = await apiClient.get('/users/profile');
-    return response.data;
-  },
-
-  updateProfile: async (data: Record<string, unknown>) => {
-    const response = await apiClient.put('/users/profile', data);
-    return response.data;
-  },
-
-  updatePassword: async (data: { currentPassword: string; newPassword: string }) => {
-    const response = await apiClient.post('/users/change-password', data);
-    return response.data;
-  },
+  getProfile: async () => (await apiClient.get('/users/profile')).data,
+  updateProfile: async (data: Record<string, unknown>) => (await apiClient.put('/users/profile', data)).data,
+  updatePassword: async (data: { currentPassword: string; newPassword: string }) => (await apiClient.post('/users/change-password', data)).data,
 };
 
-// ============================================
-// Analytics API
-// ============================================
 export const analyticsApi = {
-  getDashboard: async () => {
-    const response = await apiClient.get('/analytics/dashboard');
-    return response.data;
-  },
-
-  getRevenue: async (period?: string) => {
-    const response = await apiClient.get('/analytics/revenue', { params: { period } });
-    return response.data;
-  },
-
-  getCustomers: async () => {
-    const response = await apiClient.get('/analytics/customers');
-    return response.data;
-  },
-
-  getAIUsage: async () => {
-    const response = await apiClient.get('/analytics/ai-usage');
-    return response.data;
-  },
+  getDashboard: async () => (await apiClient.get('/analytics/dashboard')).data,
+  getRevenue: async (period?: string) => (await apiClient.get('/analytics/revenue', { params: { period } })).data,
+  getCustomers: async () => (await apiClient.get('/analytics/customers')).data,
+  getAIUsage: async () => (await apiClient.get('/analytics/ai-usage')).data,
 };
 
-// ============================================
-// AI Tools API
-// ============================================
 export const aiToolsApi = {
-  getAll: async (params?: { category?: string; search?: string; page?: number; limit?: number }) => {
-    const response = await apiClient.get('/ai-tools', { params });
-    return response.data;
-  },
-
-  getById: async (id: string) => {
-    const response = await apiClient.get(`/ai-tools/${id}`);
-    return response.data;
-  },
-
-  getCategories: async () => {
-    const response = await apiClient.get('/ai-tools/categories');
-    return response.data;
-  },
-
-  getFeatured: async () => {
-    const response = await apiClient.get('/ai-tools/featured');
-    return response.data;
-  },
-
-  getPopular: async () => {
-    const response = await apiClient.get('/ai-tools/popular');
-    return response.data;
-  },
+  getAll: async (params?: { category?: string; search?: string; page?: number; limit?: number }) => (await apiClient.get('/ai-tools', { params })).data,
+  getById: async (id: string) => (await apiClient.get(`/ai-tools/${id}`)).data,
+  getCategories: async () => (await apiClient.get('/ai-tools/categories')).data,
+  getFeatured: async () => (await apiClient.get('/ai-tools/featured')).data,
+  getPopular: async () => (await apiClient.get('/ai-tools/popular')).data,
 };
 
-// ============================================
-// WhatsApp API
-// ============================================
 export const whatsappApi = {
-  sendMessage: async (data: {
-    message: string;
-    phoneNumber?: string;
-    type?: 'text' | 'template';
-  }) => {
-    const response = await apiClient.post('/whatsapp/send', data);
-    return response.data;
-  },
-
-  getConversations: async () => {
-    const response = await apiClient.get('/whatsapp/conversations');
-    return response.data;
-  },
-
-  getTemplates: async () => {
-    const response = await apiClient.get('/whatsapp/templates');
-    return response.data;
-  },
+  sendMessage: async (data: { message: string; phoneNumber?: string; type?: 'text' | 'template' }) => (await apiClient.post('/whatsapp/send', data)).data,
+  getConversations: async () => (await apiClient.get('/whatsapp/conversations')).data,
+  getTemplates: async () => (await apiClient.get('/whatsapp/templates')).data,
 };
 
-// Export the configured client for custom requests
 export { apiClient };
 
-// Health check
 export const checkHealth = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL.replace('/api/v1', '')}/health`);
