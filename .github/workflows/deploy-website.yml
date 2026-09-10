@@ -90,3 +90,5 @@ jobs:
           grep -Eq 'assets/.*\.(js|mjs)' /tmp/c6-index.html
 
           echo "✅ Cloudflare smoke test passed"
+
+# C6 authoritative Cloudflare deployment pipeline
