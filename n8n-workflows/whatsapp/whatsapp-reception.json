@@ -1,137 +1,20 @@
 {
   "name": "C6 WhatsApp AI Receptionist",
   "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "whatsapp-incoming",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "id": "webhook-wa",
-      "name": "WhatsApp Incoming",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [250, 300]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT * FROM whatsapp_usage WHERE business_id = '{{$json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'"
-      },
-      "id": "check-quota",
-      "name": "Check Quota",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [450, 300]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "number": [{ "value1": "={{ $json.used_count }}", "operation": "smaller", "value2": "={{ $json.monthly_limit }}" }]
-        }
-      },
-      "id": "if-quota",
-      "name": "Quota Available?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [650, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://ollama:11434/api/generate",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "model": "llama3.2:1b",
-            "prompt": "You are a professional receptionist for {{$json.body.business_name}}. Reply to this WhatsApp message in a helpful, friendly tone. Keep replies under 100 words.\n\nCustomer message: {{$json.body.message}}",
-            "stream": false
-          }
-        }
-      },
-      "id": "ai-reply",
-      "name": "Generate AI Reply",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [850, 200]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://graph.facebook.com/v18.0/{{$env.WHATSAPP_PHONE_ID}}/messages",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [{ "name": "Authorization", "value": "Bearer {{$env.WHATSAPP_TOKEN}}" }]
-        },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "messaging_product": "whatsapp",
-            "to": "={{ $('WhatsApp Incoming').item.json.body.from }}",
-            "text": "={{ $json.response }}"
-          }
-        }
-      },
-      "id": "send-wa",
-      "name": "Send WhatsApp Reply",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1050, 200]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE whatsapp_usage SET used_count = used_count + 1 WHERE business_id = '{{$('WhatsApp Incoming').item.json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'"
-      },
-      "id": "increment",
-      "name": "Increment Usage",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [1250, 200]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT}}/sendMessage",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "chat_id": "={{ $env.TELEGRAM_CHAT_ID }}",
-            "text": "⚠️ Quota exceeded: {{$('WhatsApp Incoming').item.json.body.business_name}}"
-          }
-        }
-      },
-      "id": "alert",
-      "name": "Alert Quota Exceeded",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [850, 400]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"status\": \"ok\" }"
-      },
-      "id": "respond",
-      "name": "Respond",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1450, 300]
-    }
+    {"parameters":{"httpMethod":"POST","path":"whatsapp-incoming","responseMode":"lastNode"},"id":"webhook","name":"WhatsApp Incoming","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"operation":"executeQuery","query":"SELECT used_count, monthly_limit FROM whatsapp_usage WHERE business_id = '{{$json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'" },"id":"check","name":"Check Quota","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,300]},
+    {"parameters":{"conditions":{"number":[{"value1":"={{ $json.used_count }}","operation":"smaller","value2":"={{ $json.monthly_limit }}"}]}},"id":"ifq","name":"Quota OK?","type":"n8n-nodes-base.if","typeVersion":1,"position":[650,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"whatsapp_receptionist","input":"={{ $json.body.message }}","context":"Business: {{ $json.body.business_name }}"}}},"id":"orch","name":"Call Orchestrator","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[850,200]},
+    {"parameters":{"method":"POST","url":"https://graph.facebook.com/v18.0/{{$env.WHATSAPP_PHONE_ID}}/messages","sendHeaders":true,"headerParameters":{"parameters":[{"name":"Authorization","value":"Bearer {{$env.WHATSAPP_TOKEN}}"}]},"sendBody":true,"bodyParameters":{"parameters":{"messaging_product":"whatsapp","to":"={{ $("WhatsApp Incoming").item.json.body.from }}","text":"={{ $json.response }}"}}},"id":"send","name":"Send WhatsApp","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[1050,200]},
+    {"parameters":{"operation":"executeQuery","query":"UPDATE whatsapp_usage SET used_count = used_count + 1 WHERE business_id = '{{$("WhatsApp Incoming").item.json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'" },"id":"inc","name":"Increment","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[1250,200]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"status\":\"ok\"}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1450,300]}
   ],
-  "connections": {
-    "WhatsApp Incoming": { "main": [[{ "node": "Check Quota", "type": "main", "index": 0 }]] },
-    "Check Quota": { "main": [[{ "node": "Quota Available?", "type": "main", "index": 0 }]] },
-    "Quota Available?": {
-      "main": [
-        [{ "node": "Generate AI Reply", "type": "main", "index": 0 }],
-        [{ "node": "Alert Quota Exceeded", "type": "main", "index": 0 }]
-      ]
-    },
-    "Generate AI Reply": { "main": [[{ "node": "Send WhatsApp Reply", "type": "main", "index": 0 }]] },
-    "Send WhatsApp Reply": { "main": [[{ "node": "Increment Usage", "type": "main", "index": 0 }]] },
-    "Increment Usage": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
-    "Alert Quota Exceeded": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  "connections":{
+    "WhatsApp Incoming":{"main":[[{"node":"Check Quota","type":"main","index":0}]]},
+    "Check Quota":{"main":[[{"node":"Quota OK?","type":"main","index":0}]]},
+    "Quota OK?":{"main":[[{"node":"Call Orchestrator","type":"main","index":0}]]},
+    "Call Orchestrator":{"main":[[{"node":"Send WhatsApp","type":"main","index":0}]]},
+    "Send WhatsApp":{"main":[[{"node":"Increment","type":"main","index":0}]]},
+    "Increment":{"main":[[{"node":"Respond","type":"main","index":0}]]}
   }
 }
