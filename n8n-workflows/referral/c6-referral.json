@@ -1,0 +1,11 @@
+{
+  "name": "C6 Referral Program",
+  "nodes": [
+    {"parameters":{"httpMethod":"POST","path":"c6-referral","responseMode":"lastNode"},"id":"webhook","name":"Referral Signup","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"operation":"executeQuery","query":"INSERT INTO c6_referrals (referrer_email, referred_email, signup_date, status) VALUES ('{{$json.body.referrer}}', '{{$json.body.referred}}', NOW(), 'pending') RETURNING id" },"id":"store","name":"Store Referral","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"content_writer","input":"Write a referral reward email","context":"Referrer will get 1 free month when their friend signs up"}}},"id":"orch","name":"Generate Email","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"fromEmail":"referrals@c6group.co.za","toEmail":"={{ $("Referral Signup").item.json.body.referrer }}","subject":"Your referral is pending!","text":"{{ $json.response }}"},"id":"email","name":"Notify Referrer","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[850,300]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"status\":\"tracked\",\"referral_id\":\"{{ $("Store Referral").item.json.id }}\"}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1050,300]}
+  ],
+  "connections":{"Referral Signup":{"main":[[{"node":"Store Referral","type":"main","index":0}]]},"Store Referral":{"main":[[{"node":"Generate Email","type":"main","index":0}]]},"Generate Email":{"main":[[{"node":"Notify Referrer","type":"main","index":0}]]},"Notify Referrer":{"main":[[{"node":"Respond","type":"main","index":0}]]}}
+}

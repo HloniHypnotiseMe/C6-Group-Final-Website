@@ -1,0 +1,11 @@
+{
+  "name": "C6 Voice Follow-Up",
+  "nodes": [
+    {"parameters":{"rule":{"interval":[{"field":"hours","hoursInterval":12}]}},"id":"schedule","name":"Every 12 Hours","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1,"position":[250,300]},
+    {"parameters":{"operation":"executeQuery","query":"SELECT * FROM business_audits WHERE created_at > NOW() - INTERVAL '12 hours' AND follow_up_sent = false LIMIT 10" },"id":"get","name":"Get Recent Audits","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"voice_receptionist","input":"Write a 30-second voice script checking in on the audit","context":"Business: {{ $json.business_name }}. Audit summary: {{ $json.audit_summary }}"}}},"id":"orch","name":"Generate Script","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"method":"POST","url":"http://host.docker.internal:17493/generate","sendBody":true,"bodyParameters":{"parameters":{"text":"={{ $json.response }}","profile":"default"}}},"id":"tts","name":"Generate Voice","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[850,300]},
+    {"parameters":{"method":"POST","url":"https://api.twilio.com/2010-04-01/Accounts/{{$env.TWILIO_ACCOUNT_SID}}/Calls.json","sendHeaders":true,"headerParameters":{"parameters":[{"name":"Authorization","value":"Basic {{ Buffer.from($env.TWILIO_ACCOUNT_SID + ":" + $env.TWILIO_AUTH_TOKEN).toString("base64") }}"}]},"sendBody":true,"bodyParameters":{"parameters":{"To":"={{ $json.phone }}","From":"={{ $env.TWILIO_PHONE_NUMBER }}","Twiml":"<Response><Play>{{ $json.audio_url }}</Play></Response>"}}},"id":"call","name":"Call Business","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[1050,300]}
+  ],
+  "connections":{"Every 12 Hours":{"main":[[{"node":"Get Recent Audits","type":"main","index":0}]]},"Get Recent Audits":{"main":[[{"node":"Generate Script","type":"main","index":0}]]},"Generate Script":{"main":[[{"node":"Generate Voice","type":"main","index":0}]]},"Generate Voice":{"main":[[{"node":"Call Business","type":"main","index":0}]]}}
+}

@@ -1,0 +1,11 @@
+{
+  "name": "C6 Multi-Language Audit",
+  "nodes": [
+    {"parameters":{"httpMethod":"POST","path":"audit-multilang","responseMode":"lastNode"},"id":"webhook","name":"Audit Request","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"business_audit","input":"Analyse this business","context":"Business: {{ $json.body.business_name }}. Industry: {{ $json.body.industry }}. Challenges: {{ $json.body.challenges }}"}}},"id":"audit","name":"Run Audit","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[450,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"content_writer","input":"Translate this audit into {{ $json.body.language }}","context":"{{ $json.response }}"}}},"id":"translate","name":"Translate","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"fromEmail":"audit@c6group.co.za","toEmail":"={{ $("Audit Request").item.json.body.email }}","subject":"Your Business Audit ({{ $("Audit Request").item.json.body.language }})","text":"{{ $json.response }}"},"id":"email","name":"Send Audit","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[850,300]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"status\":\"sent\",\"language\":\"{{ $("Audit Request").item.json.body.language }}\"}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1050,300]}
+  ],
+  "connections":{"Audit Request":{"main":[[{"node":"Run Audit","type":"main","index":0}]]},"Run Audit":{"main":[[{"node":"Translate","type":"main","index":0}]]},"Translate":{"main":[[{"node":"Send Audit","type":"main","index":0}]]},"Send Audit":{"main":[[{"node":"Respond","type":"main","index":0}]]}}
+}
