@@ -1,0 +1,52 @@
+{
+  "name": "Ubernie Directory Listing Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 30 }] }
+      },
+      "id": "schedule",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "collectionName": "business_audits",
+        "returnAll": true
+      },
+      "id": "get-audits",
+      "name": "Get New Audits",
+      "type": "n8n-nodes-base.qdrant",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ubernie.co.za/api/listings",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": {
+            "name": "={{ $json.business_name }}",
+            "email": "={{ $json.email }}",
+            "source": "c6group_audit",
+            "tier": "free",
+            "created_at": "={{ $json.created_at }}"
+          }
+        }
+      },
+      "id": "create-listing",
+      "name": "Create Ubernie Listing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Every 30 min": { "main": [[{ "node": "Get New Audits", "type": "main", "index": 0 }]] },
+    "Get New Audits": { "main": [[{ "node": "Create Ubernie Listing", "type": "main", "index": 0 }]] }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "name": "RemotePay Subscription Checkout",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "subscribe",
+        "responseMode": "lastNode"
+      },
+      "id": "webhook-sub",
+      "name": "Subscribe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://secure.paygate.co.za/payweb3/initiate.trans",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": {
+            "PAYGATE_ID": "={{ $env.PAYGATE_ID }}",
+            "REFERENCE": "=SUB-{{ $json.body.email }}-{{ Date.now() }}",
+            "AMOUNT": "={{ $json.body.amount }}",
+            "CURRENCY": "ZAR",
+            "RETURN_URL": "https://c6group.co.za/thank-you",
+            "NOTIFY_URL": "https://api.c6group.co.za/webhook/paygate-notify",
+            "EMAIL": "={{ $json.body.email }}"
+          }
+        }
+      },
+      "id": "paygate-init",
+      "name": "PayGate Initiate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'ok', redirect: 'https://secure.paygate.co.za/payweb3/process.trans?PAY_REQUEST_ID=' + $json.PAY_REQUEST_ID + '&CHECKSUM=' + $json.CHECKSUM } }}"
+      },
+      "id": "respond-sub",
+      "name": "Redirect to PayGate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Subscribe Webhook": { "main": [[{ "node": "PayGate Initiate", "type": "main", "index": 0 }]] },
+    "PayGate Initiate": { "main": [[{ "node": "Redirect to PayGate", "type": "main", "index": 0 }]] }
+  }
+}
