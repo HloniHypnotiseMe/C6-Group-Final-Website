@@ -20,6 +20,26 @@ services:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: c6group-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  orchestrator:
+    build: ./orchestrator
+    container_name: c6group-orchestrator
+    ports:
+      - "7000:7000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
   n8n:
     image: n8nio/n8n:latest
     container_name: c6group-n8n
@@ -31,13 +51,18 @@ services:
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
       - postgres
+      - orchestrator
     restart: unless-stopped
 
 volumes:
   postgres_data:
   qdrant_data:
   n8n_data:
+  ollama_data:
