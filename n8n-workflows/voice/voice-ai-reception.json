@@ -1,144 +1,20 @@
 {
   "name": "C6 Voice AI Receptionist",
   "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "voice-incoming",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "id": "webhook-voice",
-      "name": "Incoming Call",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [250, 300]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT used_count, monthly_limit FROM voice_usage WHERE business_id = '{{$json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'"
-      },
-      "id": "check-quota",
-      "name": "Check Voice Quota",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [450, 300]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "number": [{ "value1": "={{ $json.used_count }}", "operation": "smaller", "value2": "={{ $json.monthly_limit }}" }]
-        }
-      },
-      "id": "if-quota",
-      "name": "Quota OK?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [650, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://ollama:11434/api/generate",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "model": "llama3.2:1b",
-            "prompt": "You are a professional phone receptionist for {{$json.body.business_name}}. A caller has said: \"{{$json.body.caller_speech}}\"\n\nRespond naturally and helpfully. Keep responses under 60 words. If you don't know the answer, offer to take a message.",
-            "stream": false
-          }
-        }
-      },
-      "id": "generate-response",
-      "name": "Generate Response",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [850, 200]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://host.docker.internal:17493/generate",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "text": "={{ $json.response }}",
-            "profile": "={{ $('Incoming Call').item.json.body.voice_profile || 'default' }}"
-          }
-        }
-      },
-      "id": "voiceover",
-      "name": "Generate Voice (Voicebox)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1050, 200]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.twilio.com/2010-04-01/Accounts/{{$env.TWILIO_ACCOUNT_SID}}/Calls/{{$('Incoming Call').item.json.body.call_sid}}.json",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "Basic {{ Buffer.from($env.TWILIO_ACCOUNT_SID + ':' + $env.TWILIO_AUTH_TOKEN).toString('base64') }}" }
-          ]
-        },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "Twiml": "<Response><Play>{{ $json.audio_url }}</Play></Response>"
-          }
-        }
-      },
-      "id": "twilio-play",
-      "name": "Play Response via Twilio",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1250, 200]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO voice_calls (business_id, call_sid, caller_number, caller_speech, ai_response, created_at) VALUES ('{{$('Incoming Call').item.json.body.business_id}}', '{{$('Incoming Call').item.json.body.call_sid}}', '{{$('Incoming Call').item.json.body.from}}', '{{$('Incoming Call').item.json.body.caller_speech}}', '{{ $('Generate Response').item.json.response }}', NOW())"
-      },
-      "id": "store-call",
-      "name": "Store Call Record",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [1250, 300]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "UPDATE voice_usage SET used_count = used_count + 1, updated_at = NOW() WHERE business_id = '{{$('Incoming Call').item.json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'"
-      },
-      "id": "increment",
-      "name": "Increment Usage",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [1450, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={ \"status\": \"ok\", \"response_text\": \"{{ $('Generate Response').item.json.response }}\" }"
-      },
-      "id": "respond",
-      "name": "Respond",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1650, 300]
-    }
+    {"parameters":{"httpMethod":"POST","path":"voice-incoming","responseMode":"lastNode"},"id":"webhook","name":"Incoming Call","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"operation":"executeQuery","query":"SELECT used_count, monthly_limit FROM voice_usage WHERE business_id = '{{$json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'" },"id":"check","name":"Check Quota","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,300]},
+    {"parameters":{"conditions":{"number":[{"value1":"={{ $json.used_count }}","operation":"smaller","value2":"={{ $json.monthly_limit }}"}]}},"id":"ifq","name":"Quota OK?","type":"n8n-nodes-base.if","typeVersion":1,"position":[650,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"voice_receptionist","input":"={{ $json.body.caller_speech }}","context":"Business: {{ $json.body.business_name }}"}}},"id":"orch","name":"Call Orchestrator","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[850,200]},
+    {"parameters":{"operation":"executeQuery","query":"INSERT INTO voice_calls (business_id, call_sid, caller_number, caller_speech, ai_response, created_at) VALUES ('{{$("Incoming Call").item.json.body.business_id}}', '{{$("Incoming Call").item.json.body.call_sid}}', '{{$("Incoming Call").item.json.body.from}}', '{{$("Incoming Call").item.json.body.caller_speech}}', '{{ $json.response }}', NOW())" },"id":"store","name":"Store Call","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[1050,200]},
+    {"parameters":{"operation":"executeQuery","query":"UPDATE voice_usage SET used_count = used_count + 1 WHERE business_id = '{{$("Incoming Call").item.json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'" },"id":"inc","name":"Increment","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[1250,200]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"status\":\"ok\",\"response_text\":\"{{ $("Call Orchestrator").item.json.response }}\"}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1450,300]}
   ],
-  "connections": {
-    "Incoming Call": { "main": [[{ "node": "Check Voice Quota", "type": "main", "index": 0 }]] },
-    "Check Voice Quota": { "main": [[{ "node": "Quota OK?", "type": "main", "index": 0 }]] },
-    "Quota OK?": { "main": [[{ "node": "Generate Response", "type": "main", "index": 0 }]] },
-    "Generate Response": { "main": [[{ "node": "Generate Voice (Voicebox)", "type": "main", "index": 0 }]] },
-    "Generate Voice (Voicebox)": { "main": [[{ "node": "Play Response via Twilio", "type": "main", "index": 0 }]] },
-    "Play Response via Twilio": { "main": [[{ "node": "Store Call Record", "type": "main", "index": 0 }]] },
-    "Store Call Record": { "main": [[{ "node": "Increment Usage", "type": "main", "index": 0 }]] },
-    "Increment Usage": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  "connections":{
+    "Incoming Call":{"main":[[{"node":"Check Quota","type":"main","index":0}]]},
+    "Check Quota":{"main":[[{"node":"Quota OK?","type":"main","index":0}]]},
+    "Quota OK?":{"main":[[{"node":"Call Orchestrator","type":"main","index":0}]]},
+    "Call Orchestrator":{"main":[[{"node":"Store Call","type":"main","index":0}]]},
+    "Store Call":{"main":[[{"node":"Increment","type":"main","index":0}]]},
+    "Increment":{"main":[[{"node":"Respond","type":"main","index":0}]]}
   }
 }

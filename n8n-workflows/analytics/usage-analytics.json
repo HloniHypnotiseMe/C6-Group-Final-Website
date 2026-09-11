@@ -1,89 +1,16 @@
 {
-  "name": "C6 Usage Analytics & Reporting",
+  "name": "C6 Usage Analytics",
   "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [{ "field": "hours", "hoursInterval": 6 }]
-        }
-      },
-      "id": "schedule",
-      "name": "Every 6 Hours",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1,
-      "position": [250, 300]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT\n  b.id,\n  b.name,\n  b.email,\n  COALESCE(w.used_count, 0) AS whatsapp_used,\n  COALESCE(c.used_count, 0) AS content_used,\n  COALESCE(v.used_count, 0) AS voice_used,\n  COALESCE(a.used_count, 0) AS audit_used,\n  b.subscription_tier\nFROM businesses b\nLEFT JOIN whatsapp_usage w ON b.id = w.business_id AND w.month = TO_CHAR(NOW(), 'YYYY-MM')\nLEFT JOIN content_usage c ON b.id = c.business_id AND c.month = TO_CHAR(NOW(), 'YYYY-MM')\nLEFT JOIN voice_usage v ON b.id = v.business_id AND v.month = TO_CHAR(NOW(), 'YYYY-MM')\nLEFT JOIN audit_usage a ON b.id = a.business_id AND a.month = TO_CHAR(NOW(), 'YYYY-MM')\nWHERE b.active = true"
-      },
-      "id": "get-usage",
-      "name": "Get All Usage",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [450, 300]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Calculate aggregate metrics\nconst businesses = $input.all();\nconst now = new Date();\nconst totalWhatsApp = businesses.reduce((sum, b) => sum + parseInt(b.json.whatsapp_used), 0);\nconst totalContent = businesses.reduce((sum, b) => sum + parseInt(b.json.content_used), 0);\nconst totalVoice = businesses.reduce((sum, b) => sum + parseInt(b.json.voice_used), 0);\nconst totalAudit = businesses.reduce((sum, b) => sum + parseInt(b.json.audit_used), 0);\nreturn [{\n  json: {\n    report_date: now.toISOString(),\n    total_businesses: businesses.length,\n    total_whatsapp_messages: totalWhatsApp,\n    total_content_generations: totalContent,\n    total_voice_calls: totalVoice,\n    total_audits: totalAudit,\n    top_10_businesses: businesses\n      .sort((a, b) => (parseInt(b.json.whatsapp_used) + parseInt(b.json.content_used)) - (parseInt(a.json.whatsapp_used) + parseInt(a.json.content_used)))\n      .slice(0, 10)\n      .map(b => ({ name: b.json.name, tier: b.json.subscription_tier, usage: parseInt(b.json.whatsapp_used) + parseInt(b.json.content_used) }))\n  }\n}];"
-      },
-      "id": "aggregate",
-      "name": "Aggregate Metrics",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [650, 300]
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO analytics_snapshots (report_date, total_businesses, total_whatsapp_messages, total_content_generations, total_voice_calls, total_audits, snapshot_data) VALUES (NOW(), {{ $json.total_businesses }}, {{ $json.total_whatsapp_messages }}, {{ $json.total_content_generations }}, {{ $json.total_voice_calls }}, {{ $json.total_audits }}, '{{ JSON.stringify($json) }}')"
-      },
-      "id": "store-snapshot",
-      "name": "Store Snapshot",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2,
-      "position": [850, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://ollama:11434/api/generate",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "model": "llama3.2:1b",
-            "prompt": "You are a business analyst. Summarise this usage data in a brief executive report (3-4 sentences):\n\nTotal businesses: {{ $json.total_businesses }}\nWhatsApp messages: {{ $json.total_whatsapp_messages }}\nContent generations: {{ $json.total_content_generations }}\nVoice calls: {{ $json.total_voice_calls }}\nAudits: {{ $json.total_audits }}\n\nHighlight the most notable trend.",
-            "stream": false
-          }
-        }
-      },
-      "id": "generate-summary",
-      "name": "Generate AI Summary",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [1050, 300]
-    },
-    {
-      "parameters": {
-        "fromEmail": "reports@c6group.co.za",
-        "toEmail": "{{ $env.ADMIN_EMAIL }}",
-        "subject": "C6 Group – 6-Hour Usage Report",
-        "text": "C6 Group Analytics Report\n\n{{ $json.response }}\n\nDetailed metrics:\n- Total businesses: {{ $('Aggregate Metrics').item.json.total_businesses }}\n- WhatsApp messages: {{ $('Aggregate Metrics').item.json.total_whatsapp_messages }}\n- Content generations: {{ $('Aggregate Metrics').item.json.total_content_generations }}\n- Voice calls: {{ $('Aggregate Metrics').item.json.total_voice_calls }}\n- Audits: {{ $('Aggregate Metrics').item.json.total_audits }}\n\nTop 10 businesses:\n{{ JSON.stringify($('Aggregate Metrics').item.json.top_10_businesses, null, 2) }}",
-        "options": {}
-      },
-      "id": "email-report",
-      "name": "Email Report",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
-      "position": [1250, 300]
-    }
+    {"parameters":{"rule":{"interval":[{"field":"hours","hoursInterval":6}]}},"id":"schedule","name":"Every 6 Hours","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1,"position":[250,300]},
+    {"parameters":{"operation":"executeQuery","query":"SELECT COUNT(*) AS total_businesses FROM businesses WHERE active = true" },"id":"get","name":"Get Usage","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"business_audit","input":"Generate a brief executive summary of platform usage: {{ JSON.stringify($json) }}","context":"Platform analytics report"}}},"id":"orch","name":"Call Orchestrator","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"operation":"executeQuery","query":"INSERT INTO analytics_snapshots (report_date, total_businesses, snapshot_data) VALUES (NOW(), {{ $("Get Usage").item.json.total_businesses }}, '{{ JSON.stringify($json) }}')" },"id":"store","name":"Store Snapshot","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[850,300]},
+    {"parameters":{"fromEmail":"reports@c6group.co.za","toEmail":"{{$env.ADMIN_EMAIL}}","subject":"C6 Group – Usage Report","text":"{{ $("Call Orchestrator").item.json.response }}"},"id":"email","name":"Email Report","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[1050,300]}
   ],
-  "connections": {
-    "Every 6 Hours": { "main": [[{ "node": "Get All Usage", "type": "main", "index": 0 }]] },
-    "Get All Usage": { "main": [[{ "node": "Aggregate Metrics", "type": "main", "index": 0 }]] },
-    "Aggregate Metrics": { "main": [[{ "node": "Store Snapshot", "type": "main", "index": 0 }]] },
-    "Store Snapshot": { "main": [[{ "node": "Generate AI Summary", "type": "main", "index": 0 }]] },
-    "Generate AI Summary": { "main": [[{ "node": "Email Report", "type": "main", "index": 0 }]] }
+  "connections":{
+    "Every 6 Hours":{"main":[[{"node":"Get Usage","type":"main","index":0}]]},
+    "Get Usage":{"main":[[{"node":"Call Orchestrator","type":"main","index":0}]]},
+    "Call Orchestrator":{"main":[[{"node":"Store Snapshot","type":"main","index":0}]]},
+    "Store Snapshot":{"main":[[{"node":"Email Report","type":"main","index":0}]]}
   }
 }
