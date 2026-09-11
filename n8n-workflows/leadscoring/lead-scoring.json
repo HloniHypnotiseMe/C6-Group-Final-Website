@@ -1,0 +1,10 @@
+{
+  "name": "C6 Lead Scoring",
+  "nodes": [
+    {"parameters":{"httpMethod":"POST","path":"score-lead","responseMode":"lastNode"},"id":"webhook","name":"Lead Data","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"sales_agent","input":"Score this lead 1-10 and explain why: Business: {{ $json.body.business_name }}, Industry: {{ $json.body.industry }}, Size: {{ $json.body.size }}, Engagement: {{ $json.body.engagement }}","context":"Lead scoring"}}},"id":"orch","name":"Score Lead","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[450,300]},
+    {"parameters":{"operation":"executeQuery","query":"INSERT INTO lead_scores (business_name, email, score, reasoning, created_at) VALUES ('{{$("Lead Data").item.json.body.business_name}}', '{{$("Lead Data").item.json.body.email}}', '{{ $json.response }}', '{{ $json.response }}', NOW())" },"id":"store","name":"Store Score","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[650,300]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"score\":\"{{ $json.response }}\"}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[850,300]}
+  ],
+  "connections":{"Lead Data":{"main":[[{"node":"Score Lead","type":"main","index":0}]]},"Score Lead":{"main":[[{"node":"Store Score","type":"main","index":0}]]},"Store Score":{"main":[[{"node":"Respond","type":"main","index":0}]]}}
+}

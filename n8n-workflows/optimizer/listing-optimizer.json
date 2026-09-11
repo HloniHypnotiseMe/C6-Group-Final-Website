@@ -1,0 +1,10 @@
+{
+  "name": "C6 Listing Optimizer",
+  "nodes": [
+    {"parameters":{"httpMethod":"POST","path":"optimize-listing","responseMode":"lastNode"},"id":"webhook","name":"Listing Request","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"content_writer","input":"Optimize this business listing for SEO and conversions: {{ $json.body.listing }}","context":"Business type: {{ $json.body.business_type }}"}}},"id":"orch","name":"Call Orchestrator","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[450,300]},
+    {"parameters":{"method":"POST","url":"https://ubernie.co.za/api/listings/{{ $("Listing Request").item.json.body.listing_id }}","sendBody":true,"bodyParameters":{"parameters":{"optimized_content":"={{ $json.response }}"}}},"id":"update","name":"Update Ubernie","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"status\":\"optimized\",\"content\":\"{{ $("Call Orchestrator").item.json.response }}\"}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[850,300]}
+  ],
+  "connections":{"Listing Request":{"main":[[{"node":"Call Orchestrator","type":"main","index":0}]]},"Call Orchestrator":{"main":[[{"node":"Update Ubernie","type":"main","index":0}]]},"Update Ubernie":{"main":[[{"node":"Respond","type":"main","index":0}]]}}
+}

@@ -1,0 +1,11 @@
+{
+  "name": "C6 Weekly Report",
+  "nodes": [
+    {"parameters":{"rule":{"interval":[{"field":"cronExpression","expression":"0 9 * * 1"}]}},"id":"schedule","name":"Every Monday 9am","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1,"position":[250,300]},
+    {"parameters":{"operation":"executeQuery","query":"SELECT COUNT(*) AS total_audits FROM business_audits WHERE created_at > NOW() - INTERVAL '7 days'" },"id":"audits","name":"Get Audits","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,300]},
+    {"parameters":{"operation":"executeQuery","query":"SELECT COUNT(*) AS total_content FROM content_generations WHERE created_at > NOW() - INTERVAL '7 days'" },"id":"content","name":"Get Content","type":"n8n-nodes-base.postgres","typeVersion":2,"position":[450,400]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"business_audit","input":"Write a weekly executive summary based on: {{ $json }}","context":"Weekly metrics for C6 Group"}}},"id":"orch","name":"Generate Report","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"fromEmail":"reports@c6group.co.za","toEmail":"{{$env.ADMIN_EMAIL}}","subject":"C6 Weekly Report","text":"{{ $json.response }}"},"id":"email","name":"Email Report","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[850,300]}
+  ],
+  "connections":{"Every Monday 9am":{"main":[[{"node":"Get Audits","type":"main","index":0}]]},"Get Audits":{"main":[[{"node":"Get Content","type":"main","index":0}]]},"Get Content":{"main":[[{"node":"Generate Report","type":"main","index":0}]]},"Generate Report":{"main":[[{"node":"Email Report","type":"main","index":0}]]}}
+}

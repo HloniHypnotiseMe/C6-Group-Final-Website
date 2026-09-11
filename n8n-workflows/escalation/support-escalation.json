@@ -1,0 +1,11 @@
+{
+  "name": "C6 Support Escalation",
+  "nodes": [
+    {"parameters":{"httpMethod":"POST","path":"support-ticket","responseMode":"lastNode"},"id":"webhook","name":"Support Ticket","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"support_agent","input":"={{ $json.body.message }}","context":"Customer tier: {{ $json.body.tier }}"}}},"id":"orch","name":"Call Orchestrator","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[450,300]},
+    {"parameters":{"conditions":{"number":[{"value1":"={{ $json.confidence || 0.5 }}","operation":"smaller","value2":"0.7"}]}},"id":"ifc","name":"Low Confidence?","type":"n8n-nodes-base.if","typeVersion":1,"position":[650,300]},
+    {"parameters":{"fromEmail":"support@c6group.co.za","toEmail":"{{$env.ADMIN_EMAIL}}","subject":"URGENT: Support escalation needed","text":"Ticket from {{ $("Support Ticket").item.json.body.email }}\n\nMessage: {{ $("Support Ticket").item.json.body.message }}\n\nAI response: {{ $("Call Orchestrator").item.json.response }}"},"id":"escalate","name":"Escalate to Human","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[850,200]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"response\":\"{{ $("Call Orchestrator").item.json.response }}\",\"escalated\":false}"},"id":"res","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[850,400]}
+  ],
+  "connections":{"Support Ticket":{"main":[[{"node":"Call Orchestrator","type":"main","index":0}]]},"Call Orchestrator":{"main":[[{"node":"Low Confidence?","type":"main","index":0}]]},"Low Confidence?":{"main":[[{"node":"Escalate to Human","type":"main","index":0}],[{"node":"Respond","type":"main","index":0}]]}}
+}

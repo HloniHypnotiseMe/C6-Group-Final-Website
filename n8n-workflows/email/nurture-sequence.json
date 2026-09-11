@@ -1,0 +1,13 @@
+{
+  "name": "C6 Email Nurture Sequence",
+  "nodes": [
+    {"parameters":{"httpMethod":"POST","path":"nurture-start","responseMode":"lastNode"},"id":"webhook","name":"New Lead","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"amount":0,"unit":"days"},"id":"wait1","name":"Wait Day 1","type":"n8n-nodes-base.wait","typeVersion":1,"position":[450,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"content_writer","input":"Write a value-add follow-up email for {{ $("New Lead").item.json.body.business_name }}","context":"Their audit identified: {{ $("New Lead").item.json.body.audit_summary }}"}}},"id":"email1","name":"Email 1","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[650,300]},
+    {"parameters":{"fromEmail":"hello@c6group.co.za","toEmail":"={{ $("New Lead").item.json.body.email }}","subject":"Your audit + what to do next","text":"={{ $json.response }}"},"id":"send1","name":"Send Email 1","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[850,300]},
+    {"parameters":{"amount":3,"unit":"days"},"id":"wait2","name":"Wait Day 3","type":"n8n-nodes-base.wait","typeVersion":1,"position":[1050,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"sales_agent","input":"Write a soft pitch for the Diamond tier to {{ $("New Lead").item.json.body.business_name }}","context":"Based on audit findings"}}},"id":"email2","name":"Email 2","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[1250,300]},
+    {"parameters":{"fromEmail":"hello@c6group.co.za","toEmail":"={{ $("New Lead").item.json.body.email }}","subject":"Ready to implement?","text":"={{ $json.response }}"},"id":"send2","name":"Send Email 2","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[1450,300]}
+  ],
+  "connections":{"New Lead":{"main":[[{"node":"Wait Day 1","type":"main","index":0}]]},"Wait Day 1":{"main":[[{"node":"Email 1","type":"main","index":0}]]},"Email 1":{"main":[[{"node":"Send Email 1","type":"main","index":0}]]},"Send Email 1":{"main":[[{"node":"Wait Day 3","type":"main","index":0}]]},"Wait Day 3":{"main":[[{"node":"Email 2","type":"main","index":0}]]},"Email 2":{"main":[[{"node":"Send Email 2","type":"main","index":0}]]}}
+}
