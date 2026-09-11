@@ -1,86 +1,16 @@
 {
   "name": "C6 Free Business Audit",
   "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "audit",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "id": "webhook",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [250, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://ollama:11434/api/generate",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": {
-            "model": "llama3.2:1b",
-            "prompt": "You are a business analyst. Analyse this business and give 5 specific opportunities to improve revenue, reduce costs, and increase customer engagement.\n\nBusiness Name: {{$json.body.business_name}}\nIndustry: {{$json.body.industry}}\nWebsite: {{$json.body.website}}\nCurrent Challenges: {{$json.body.challenges}}\n\nOutput as a professional report with headings.",
-            "stream": false
-          }
-        },
-        "options": {}
-      },
-      "id": "ollama",
-      "name": "Ollama Audit",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4,
-      "position": [450, 300]
-    },
-    {
-      "parameters": {
-        "operation": "createDocument",
-        "collectionName": "business_audits",
-        "content": "={{ $json.response }}",
-        "additionalFields": {
-          "business_name": "={{ $('Webhook').item.json.body.business_name }}",
-          "email": "={{ $('Webhook').item.json.body.email }}",
-          "created_at": "={{ new Date().toISOString() }}"
-        }
-      },
-      "id": "qdrant",
-      "name": "Store Audit",
-      "type": "n8n-nodes-base.qdrant",
-      "typeVersion": 1,
-      "position": [650, 300]
-    },
-    {
-      "parameters": {
-        "fromEmail": "audit@c6group.co.za",
-        "toEmail": "={{ $('Webhook').item.json.body.email }}",
-        "subject": "Your Free AI Business Audit – C6 Group",
-        "text": "Hi {{ $('Webhook').item.json.body.business_name }},\n\nHere is your free AI business audit:\n\n{{ $json.response }}\n\nReady to implement these? Reply to this email to book a call.\n\nC6 Group Team\nhttps://c6group.co.za",
-        "options": {}
-      },
-      "id": "email",
-      "name": "Send Email",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
-      "position": [850, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"status\": \"success\", \"message\": \"Audit sent to your email\"}"
-      },
-      "id": "respond",
-      "name": "Respond",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1050, 300]
-    }
+    {"parameters":{"httpMethod":"POST","path":"audit","responseMode":"lastNode"},"id":"webhook","name":"Webhook","type":"n8n-nodes-base.webhook","typeVersion":2,"position":[250,300]},
+    {"parameters":{"method":"POST","url":"http://orchestrator:7000/run","sendBody":true,"bodyParameters":{"parameters":{"agent":"business_audit","input":"={{ $json.body.business_name }} - {{ $json.body.industry }}. Challenges: {{ $json.body.challenges }}"}}},"id":"orchestrate","name":"Call Orchestrator","type":"n8n-nodes-base.httpRequest","typeVersion":4,"position":[450,300]},
+    {"parameters":{"operation":"createDocument","collectionName":"business_audits","content":"={{ $json.response }}","additionalFields":{"business_name":"={{ $("Webhook").item.json.body.business_name }}","email":"={{ $("Webhook").item.json.body.email }}"}},"id":"qdrant","name":"Store Audit","type":"n8n-nodes-base.qdrant","typeVersion":1,"position":[650,300]},
+    {"parameters":{"fromEmail":"audit@c6group.co.za","toEmail":"={{ $("Webhook").item.json.body.email }}","subject":"Your Free AI Business Audit","text":"Hi {{ $("Webhook").item.json.body.business_name }},\n\n{{ $("Call Orchestrator").item.json.response }}\n\nReply to book a call.\n\nC6 Group"},"id":"email","name":"Send Email","type":"n8n-nodes-base.emailSend","typeVersion":2,"position":[850,300]},
+    {"parameters":{"respondWith":"json","responseBody":"={\"status\":\"success\"}"},"id":"respond","name":"Respond","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1050,300]}
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Ollama Audit", "type": "main", "index": 0 }]] },
-    "Ollama Audit": { "main": [[{ "node": "Store Audit", "type": "main", "index": 0 }]] },
-    "Store Audit": { "main": [[{ "node": "Send Email", "type": "main", "index": 0 }]] },
-    "Send Email": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+    "Webhook": {"main": [[{"node": "Call Orchestrator","type": "main","index": 0}]]},
+    "Call Orchestrator": {"main": [[{"node": "Store Audit","type": "main","index": 0}]]},
+    "Store Audit": {"main": [[{"node": "Send Email","type": "main","index": 0}]]},
+    "Send Email": {"main": [[{"node": "Respond","type": "main","index": 0}]]}
   }
 }
