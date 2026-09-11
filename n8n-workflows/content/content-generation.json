@@ -1,0 +1,138 @@
+{
+  "name": "C6 Content Generation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-content",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-content",
+      "name": "Content Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT used_count, monthly_limit FROM content_usage WHERE business_id = '{{$json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'"
+      },
+      "id": "check-quota",
+      "name": "Check Content Quota",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $json.used_count }}", "operation": "smaller", "value2": "={{ $json.monthly_limit }}" }]
+        }
+      },
+      "id": "if-quota",
+      "name": "Quota OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": {
+            "model": "llama3.2:1b",
+            "prompt": "You are a professional content creator. Create {{$json.body.content_type}} content for:\n\nBusiness: {{$json.body.business_name}}\nTopic: {{$json.body.topic}}\nTone: {{$json.body.tone}}\nLength: {{$json.body.length}}\n\nOutput the content directly, ready to publish.",
+            "stream": false
+          }
+        }
+      },
+      "id": "gen-content",
+      "name": "Generate Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{ "value1": "={{ $('Content Request').item.json.body.needs_voiceover }}", "value2": "true" }]
+        }
+      },
+      "id": "if-voice",
+      "name": "Needs Voiceover?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:17493/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": {
+            "text": "={{ $json.response }}",
+            "profile": "={{ $('Content Request').item.json.body.voice_profile || 'default' }}"
+          }
+        }
+      },
+      "id": "voiceover",
+      "name": "Generate Voiceover (Voicebox)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 150]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO content_generations (business_id, content_type, topic, content, created_at) VALUES ('{{$('Content Request').item.json.body.business_id}}', '{{$('Content Request').item.json.body.content_type}}', '{{$('Content Request').item.json.body.topic}}', '{{ $json.response }}', NOW())"
+      },
+      "id": "store-content",
+      "name": "Store Content",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1250, 250]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE content_usage SET used_count = used_count + 1, updated_at = NOW() WHERE business_id = '{{$('Content Request').item.json.body.business_id}}' AND month = '{{ new Date().toISOString().slice(0,7) }}'"
+      },
+      "id": "increment",
+      "name": "Increment Usage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1450, 250]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"content\": \"{{ $('Generate Content').item.json.response }}\",\n  \"voiceover_url\": \"{{ $json.audio_url || 'not_requested' }}\",\n  \"remaining\": \"{{ $json.monthly_limit - $json.used_count - 1 }}\"\n}"
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "Content Request": { "main": [[{ "node": "Check Content Quota", "type": "main", "index": 0 }]] },
+    "Check Content Quota": { "main": [[{ "node": "Quota OK?", "type": "main", "index": 0 }]] },
+    "Quota OK?": { "main": [[{ "node": "Generate Content", "type": "main", "index": 0 }]] },
+    "Generate Content": { "main": [[{ "node": "Needs Voiceover?", "type": "main", "index": 0 }]] },
+    "Needs Voiceover?": {
+      "main": [
+        [{ "node": "Generate Voiceover (Voicebox)", "type": "main", "index": 0 }],
+        [{ "node": "Store Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Voiceover (Voicebox)": { "main": [[{ "node": "Store Content", "type": "main", "index": 0 }]] },
+    "Store Content": { "main": [[{ "node": "Increment Usage", "type": "main", "index": 0 }]] },
+    "Increment Usage": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  }
+}
